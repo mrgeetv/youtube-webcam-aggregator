@@ -1,8 +1,27 @@
 # Project: YouTube Live Webcam Aggregator
 
-## Conventional Commit Scopes
+## Conventional Commit Format
 
-Valid scopes for this project:
+Format: `type(scope): description`
+
+### Commit Types
+
+**Release types** (trigger version bumps):
+- `feat` - New feature (minor version bump)
+- `fix` - Bug fix (patch version bump)
+- `perf` - Performance improvement (patch version bump)
+- `revert` - Revert previous change (patch version bump)
+- `refactor` - Code refactoring (patch version bump)
+
+**Non-release types** (no version bump):
+- `docs` - Documentation changes
+- `style` - Code style/formatting
+- `chore` - Maintenance tasks
+- `test` - Test changes
+- `build` - Build system changes
+- `ci` - CI/CD changes
+
+### Valid Scopes
 
 - `docker` - Dockerfile, docker-compose.yml
 - `api` - YouTube API integration
