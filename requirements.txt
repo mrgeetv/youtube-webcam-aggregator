@@ -1,4 +1,4 @@
-google-api-python-client
-google-auth-oauthlib
-google-auth-httplib2
-yt-dlp
+google-api-python-client==2.187.0
+google-auth-oauthlib==1.2.3
+google-auth-httplib2==0.2.1
+yt-dlp==2025.11.12
