@@ -1,0 +1,71 @@
+name: CI Validation
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_call: # Allow other workflows to call this
+  workflow_dispatch: # Manual trigger
+
+permissions:
+  contents: read
+
+jobs:
+  pre-commit:
+    name: Pre-commit Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          # Read Python version from .python-version file
+          python-version-file: ".python-version"
+          # Cache pip dependencies (pre-commit package itself)
+          cache: "pip"
+          cache-dependency-path: "requirements-dev.txt"
+
+      - name: Cache pre-commit hooks
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.cache/pre-commit/
+          # Key includes Python version and config hash for proper invalidation
+          key: pre-commit-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: |
+            pre-commit-${{ steps.setup-python.outputs.python-version }}-
+
+      - name: Install pre-commit
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run pre-commit hooks
+        run: pre-commit run --all-files --show-diff-on-failure
+
+  ci-summary:
+    name: Validation Results
+    runs-on: ubuntu-latest
+    needs: [pre-commit]
+    if: always()
+
+    steps:
+      - name: CI Status
+        run: |
+          echo "## 🧪 CI Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Pre-commit | ${{ needs.pre-commit.result == 'success' && '✅ Pass' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.pre-commit.result }}" == "success" ]]; then
+            echo "✅ All CI checks passed!"
+          else
+            echo "❌ CI checks failed - please fix before proceeding"
+            exit 1
+          fi
