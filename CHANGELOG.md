@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.4](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.0.3...v1.0.4) (2025-12-05)
+
+
+### Bug Fixes
+
+* **docker:** add --no-cache-dir flag to pip install ([7e27a5b](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/7e27a5b7656ac1a0d1c0fed373bae49cc63c9ead))
+* **docker:** pin Python version to 3.14-slim ([a96eda4](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/a96eda40143f876d6852fa3b086aff561252b41a))
+
 ## [1.0.3](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.0.2...v1.0.3) (2025-12-05)
 
 
