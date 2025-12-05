@@ -4,6 +4,9 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
+# Expose HTTP server port
+EXPOSE 8000
+
 # Install Deno runtime (required for yt-dlp YouTube extraction)
 # See: https://github.com/yt-dlp/yt-dlp/wiki/EJS
 # Using official Deno binary image: https://github.com/denoland/deno_docker

@@ -1,0 +1,120 @@
+# Development Guide
+
+This guide covers local development setup for contributors and developers who want to build and test changes locally.
+
+## Prerequisites
+
+- Docker and Docker Compose
+- pre-commit (for code quality checks)
+
+## Local Development Setup
+
+### Clone and Configure
+
+```bash
+git clone https://github.com/mrgeetv/youtube-webcam-aggregator.git
+cd youtube-webcam-aggregator
+
+# Copy environment template
+cp .env.example .env
+
+# Edit .env and add your YouTube API key
+```
+
+### Using Docker Compose
+
+Docker Compose is recommended for local development as it rebuilds from source:
+
+```bash
+# Start the service
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Restart after code changes
+docker-compose down && docker-compose up -d --build
+```
+
+**Playlist URL:** `http://localhost:23457/playlist.m3u8`
+
+### Using the Run Script
+
+A helper script is provided for common operations:
+
+```bash
+# Build and run with cache
+scripts/run.sh
+
+# Build without cache (clean build)
+scripts/run.sh --no-cache
+```
+
+## Pre-commit Hooks
+
+This project uses pre-commit hooks for code quality. Install them before making changes:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+Hooks will run automatically on commit, checking:
+
+- Python formatting (black)
+- Python linting (flake8)
+- Shell script validation (shellcheck)
+- Dockerfile linting (hadolint)
+- Markdown formatting (markdownlint)
+- Conventional commit messages
+
+To run hooks manually:
+
+```bash
+pre-commit run --all-files
+```
+
+## Project Structure
+
+```text
+youtube-webcam-aggregator/
+├── src/                    # Python source code
+│   └── get_streams.py      # Main application
+├── scripts/                # Helper scripts
+│   ├── run.sh              # Docker build/run script
+│   └── check-python-version.sh
+├── .github/workflows/      # CI/CD pipelines
+├── Dockerfile              # Container definition
+├── docker-compose.yml      # Development compose file
+├── requirements.txt        # Python dependencies
+└── requirements-dev.txt    # Development dependencies
+```
+
+## Port Configuration
+
+- **Internal port:** 8000 (hardcoded in Python application)
+- **Docker Compose port:** 23457 (mapped from 8000)
+
+The HTTP server uses Python's built-in `http.server.SimpleHTTPRequestHandler` to serve the generated playlist file.
+
+## Making Changes
+
+1. Fork the repository on GitHub
+2. Clone your fork locally
+3. Create a feature branch from `main`
+4. Make your changes
+5. Ensure pre-commit hooks pass
+6. Test locally with Docker Compose
+7. Push to your fork and submit a pull request
+
+## Commit Messages
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/). Format:
+
+```text
+type(scope): description
+```
+
+Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `ci`
+
+Scopes: `docker`, `api`, `playlist`, `config`, `deps`, `ci`, `docs`
