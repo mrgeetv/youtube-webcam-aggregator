@@ -238,7 +238,7 @@ def get_video_details(
 
     for i in range(0, len(video_ids), 50):
         chunk = video_ids[i : i + 50]
-        logger.info(f"Processing batch {i+1}-{i+len(chunk)}/{len(video_ids)}")
+        logger.info(f"Processing batch {i + 1}-{i + len(chunk)}/{len(video_ids)}")
 
         try:
             request = youtube.videos().list(part="snippet", id=",".join(chunk))

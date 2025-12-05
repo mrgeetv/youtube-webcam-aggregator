@@ -1,0 +1,28 @@
+version: 2
+updates:
+  # Python dependencies - Friday morning for weekend review
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "friday"
+      time: "08:00"
+      timezone: "Etc/UTC"
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
+    # Proper conventional commit format for strict validation
+    commit-message:
+      prefix: "fix(deps)"
+
+  # GitHub Actions - Monthly on Friday
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "friday"
+      time: "08:00"
+    # Proper conventional commit format for strict validation
+    commit-message:
+      prefix: "fix(deps)"
