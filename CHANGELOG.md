@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.3](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.0.2...v1.0.3) (2025-12-05)
+
+
+### Bug Fixes
+
+* **deps:** restore version pinning in requirements.txt ([cb7019f](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/cb7019f41400afae55db2a03cbaea5b6765e8d2c))
+* **docker:** add Deno runtime for yt-dlp YouTube extraction ([cf06b4c](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/cf06b4ce091e2b176f8dfc4b00a6c1d4a9671228))
+
 ## [1.0.2](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.0.1...v1.0.2) (2025-12-05)
 
 
