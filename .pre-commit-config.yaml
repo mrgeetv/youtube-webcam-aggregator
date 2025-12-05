@@ -49,6 +49,7 @@ repos:
     rev: 7.3.0
     hooks:
       - id: flake8
+        args: ["--ignore=E501,E203"]
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1

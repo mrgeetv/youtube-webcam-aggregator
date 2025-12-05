@@ -7,6 +7,7 @@ Format: `type(scope): description`
 ### Commit Types
 
 **Release types** (trigger version bumps):
+
 - `feat` - New feature (minor version bump)
 - `fix` - Bug fix (patch version bump)
 - `perf` - Performance improvement (patch version bump)
@@ -14,6 +15,7 @@ Format: `type(scope): description`
 - `refactor` - Code refactoring (patch version bump)
 
 **Non-release types** (no version bump):
+
 - `docs` - Documentation changes
 - `style` - Code style/formatting
 - `chore` - Maintenance tasks
@@ -34,3 +36,12 @@ Format: `type(scope): description`
 ## Dependency Management
 
 When adding or updating dependencies (Python packages, GitHub Actions, pre-commit hooks, etc.), always search the web for the latest stable versions before specifying version numbers.
+
+## Pre-commit Behavior
+
+When pre-commit finds issues:
+
+- **Never automatically fix them**
+- Always present the issues to the user first
+- Let the user decide whether to fix, ignore, or configure exceptions
+- This includes: file permissions, line length violations, formatting issues, etc.
