@@ -45,3 +45,12 @@ When pre-commit finds issues:
 - Always present the issues to the user first
 - Let the user decide whether to fix, ignore, or configure exceptions
 - This includes: file permissions, line length violations, formatting issues, etc.
+
+## Bash Script Best Practices
+
+Always use modern bash syntax:
+
+- Use `[[ ]]` instead of `[ ]` for test conditions
+- Use `$(command)` instead of backticks
+- Quote all variable expansions: `"$var"`
+- Use `#!/bin/bash` shebang
