@@ -1,8 +1,6 @@
 name: CI Validation
 
 on:
-  push:
-    branches-ignore: ["main", "build/**"] # Exclude main (release.yml) and build/** (build.yml)
   pull_request:
     branches: [main]
   workflow_call: # Allow other workflows to call this
