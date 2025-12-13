@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.7](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.0.6...v1.0.7) (2025-12-13)
+
+
+### Bug Fixes
+
+* **deps:** bump actions/cache from 4.3.0 to 5.0.1 ([#15](https://github.com/mrgeetv/youtube-webcam-aggregator/issues/15)) ([9e015bb](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/9e015bb4ef0985bc307f17acc712f1f136e0dbd1))
+* **deps:** bump hadolint/hadolint-action from 3.1.0 to 3.3.0 ([#16](https://github.com/mrgeetv/youtube-webcam-aggregator/issues/16)) ([e0d570d](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/e0d570d62d1c17f1810b963829842d119b874ba3))
+
 ## [1.0.6](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.0.5...v1.0.6) (2025-12-13)
 
 
