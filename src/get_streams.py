@@ -19,14 +19,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TextIO
 
-import yt_dlp
+import psutil
+import subprocess
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-    level=logging.INFO,
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
     force=True,
 )
 logger = logging.getLogger("webcam-scraper")
@@ -53,9 +55,21 @@ except ValueError as e:
     UPDATE_INTERVAL_HOURS = 5
 
 
+def log_memory_usage() -> None:
+    """Log current memory usage."""
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
+
+    process = psutil.Process(os.getpid())
+    mem_mb = process.memory_info().rss / 1024 / 1024
+    logger.debug(f"Memory: {mem_mb:.0f} MB")
+
+
 def get_youtube_stream_url(video_id: str) -> Optional[str]:
     """
-    Extract the direct stream URL for a YouTube video using yt-dlp.
+    Extract the direct stream URL for a YouTube video using yt-dlp subprocess.
+
+    Uses subprocess to avoid memory leaks from yt-dlp's internal caching.
 
     Args:
         video_id: YouTube video ID
@@ -64,20 +78,23 @@ def get_youtube_stream_url(video_id: str) -> Optional[str]:
         Direct stream URL if extraction succeeds, None otherwise
     """
     try:
-        embed_url = f"https://www.youtube.com/watch?v={video_id}"
-        with yt_dlp.YoutubeDL({"quiet": True}) as ydl:
-            info = ydl.extract_info(embed_url, download=False)
-            if not info or not isinstance(info, dict):
-                logger.debug(f"Invalid info structure for {video_id}")
-                return None
-
-            formats = info.get("formats", [])
-            if not formats:
-                logger.debug(f"No formats found for {video_id}")
-                return None
-
-            # Get the last format (usually highest quality)
-            return formats[-1]["url"]
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        result = subprocess.run(
+            ["yt-dlp", "-q", "--no-warnings", "-g", url],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            # Return last URL (usually best quality)
+            urls = result.stdout.strip().split("\n")
+            return urls[-1]
+        if result.stderr:
+            logger.debug(f"yt-dlp error for {video_id}: {result.stderr.strip()}")
+        return None
+    except subprocess.TimeoutExpired:
+        logger.debug(f"Timeout extracting stream for {video_id}")
+        return None
     except Exception as e:
         logger.debug(f"Stream extraction failed for {video_id}: {str(e)}")
         return None
@@ -239,6 +256,7 @@ def get_video_details(
     for i in range(0, len(video_ids), 50):
         chunk = video_ids[i : i + 50]
         logger.info(f"Processing batch {i + 1}-{i + len(chunk)}/{len(video_ids)}")
+        log_memory_usage()
 
         try:
             request = youtube.videos().list(part="snippet", id=",".join(chunk))
@@ -339,6 +357,7 @@ async def main() -> None:
     while True:
         try:
             logger.info("Starting scrape cycle")
+            log_memory_usage()
             success = generate_playlist()
 
             if success:
@@ -346,6 +365,7 @@ async def main() -> None:
             else:
                 logger.warning("Cycle completed with errors")
 
+            log_memory_usage()
             logger.info(f"Sleeping for {UPDATE_INTERVAL_HOURS} hours")
             await asyncio.sleep(3600 * UPDATE_INTERVAL_HOURS)
 

@@ -6,6 +6,7 @@ services:
     ports:
       - "23457:8000"
     environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - EXCLUDED_CATEGORIES=${EXCLUDED_CATEGORIES:-Gaming,Sports,Film & Animation,Howto & Style}
       - SEARCH_QUERY=${SEARCH_QUERY:-cam live webcam beach wildlife aquarium space harbor park mountain coast -gameplay -playing -subscriber -donation -follower -facecam -reaction -chatting -gaming -fortnite -troll -asmr -twitch}
       - UPDATE_INTERVAL_HOURS=${UPDATE_INTERVAL_HOURS:-5}

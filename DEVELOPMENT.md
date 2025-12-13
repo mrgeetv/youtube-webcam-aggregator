@@ -97,6 +97,44 @@ youtube-webcam-aggregator/
 
 The HTTP server uses Python's built-in `http.server.SimpleHTTPRequestHandler` to serve the generated playlist file.
 
+## Debugging
+
+### Log Levels
+
+Set `LOG_LEVEL` in your `.env` file to control logging verbosity:
+
+```bash
+# In .env file
+LOG_LEVEL=DEBUG
+```
+
+Available levels: `DEBUG`, `INFO`, `WARNING`, `ERROR`
+
+### Memory Tracking
+
+When `LOG_LEVEL=DEBUG`, memory usage is logged at:
+
+- Start and end of each scrape cycle
+- After each batch of 50 videos processed
+
+Example output:
+
+```text
+2024-01-15 10:30:00 DEBUG [webcam-scraper] Memory: 145 MB
+```
+
+This helps identify memory leaks from yt-dlp.
+
+### Viewing Debug Logs
+
+```bash
+# Ensure LOG_LEVEL=DEBUG is set in .env, then restart
+docker-compose down && docker-compose up -d
+
+# View logs
+docker-compose logs -f
+```
+
 ## Making Changes
 
 1. Fork the repository on GitHub

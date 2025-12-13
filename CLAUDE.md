@@ -28,6 +28,7 @@ Format: `type(scope): description`
 - `docker` - Dockerfile, docker-compose.yml
 - `api` - YouTube API integration
 - `playlist` - M3U8 playlist generation
+- `scraper` - Stream extraction, yt-dlp, memory management
 - `config` - Environment variables, configuration
 - `deps` - Dependency updates
 - `ci` - CI/CD workflows, automation
