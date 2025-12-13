@@ -16,13 +16,14 @@ updates:
     commit-message:
       prefix: "fix(deps)"
 
-  # GitHub Actions - Monthly on Friday
+  # GitHub Actions - Weekly on Friday
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
       day: "friday"
       time: "08:00"
+      timezone: "Etc/UTC"
     # Proper conventional commit format for strict validation
     commit-message:
       prefix: "fix(deps)"
