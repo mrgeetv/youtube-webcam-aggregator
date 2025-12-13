@@ -26,3 +26,14 @@ updates:
     # Proper conventional commit format for strict validation
     commit-message:
       prefix: "fix(deps)"
+
+  # Docker base images - Weekly on Friday
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "friday"
+      time: "08:00"
+      timezone: "Etc/UTC"
+    commit-message:
+      prefix: "fix(deps)"
