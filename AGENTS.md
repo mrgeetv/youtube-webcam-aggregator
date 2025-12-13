@@ -42,9 +42,13 @@ Format: `type(scope): description`
 - `ci` - CI/CD workflows, automation
 - `docs` - Documentation, README
 
-## Dependency Management
+## Dependency Version Research
 
-When adding or updating dependencies (Python packages, GitHub Actions, pre-commit hooks, etc.), always search the web for the latest stable versions before specifying version numbers.
+When adding or updating versioned dependencies (Python packages, GitHub Actions, pre-commit hooks, Docker images, etc.):
+
+1. Find the GitHub repo (WebSearch if URL unknown)
+2. Fetch GitHub releases page directly (WebFetch)
+3. If version cannot be verified from GitHub, stop and ask user to confirm
 
 ## Pre-commit Behavior
 
@@ -71,14 +75,6 @@ When updating this file:
 - **Never duplicate information** - check existing sections before adding new content
 - **Reorganize instead of duplicating** - if information exists but is unclear, reorganize or clarify existing sections
 - **Add only project-specific information** - valid scopes, project-specific tools, version constraints
-
-## Version Research Protocol
-
-When researching software versions (pre-commit hooks, GitHub Actions, dependencies):
-
-1. **ALWAYS fetch GitHub releases page directly FIRST** - use WebFetch on the releases URL
-2. **WebSearch is only a fallback** - only use if WebFetch fails
-3. **Never trust version numbers from WebSearch** - results are often stale and outdated
 
 ## Code Quality Tools
 
