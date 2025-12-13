@@ -10,7 +10,7 @@ Automatically discovers live webcam streams on YouTube and generates an M3U8 pla
 - Organized by category (Animals, Transportation, Education, etc.)
 - Customizable search and filtering
 - Docker containerized for easy deployment
-- Compatible with most IPTV players
+- Compatible with any M3U-capable player (VLC, IPTV apps, smart TVs, etc.)
 
 ## Quick Start
 
@@ -48,7 +48,7 @@ docker run -d \
 - Use `localhost` for local installations
 - Use your server's IP or hostname for remote access
 
-Copy this URL into any IPTV player that supports M3U8 streams!
+Open this URL in any M3U-compatible player (VLC, IPTV apps, media players, etc.)
 
 ## Configuration
 
