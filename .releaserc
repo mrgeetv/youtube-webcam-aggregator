@@ -132,6 +132,11 @@
         "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
       }
     ],
-    "@semantic-release/github"
+    [
+      "@semantic-release/github",
+      {
+        "releaseBodyTemplate": "<%= nextRelease.notes %>\n\n## Container Image\n\nPull this release:\n```bash\ndocker pull ghcr.io/mrgeetv/youtube-webcam-aggregator:v<%= nextRelease.version %>\n```\n\n[View all tags on GitHub Container Registry](https://github.com/mrgeetv/youtube-webcam-aggregator/pkgs/container/youtube-webcam-aggregator)"
+      }
+    ]
   ]
 }
