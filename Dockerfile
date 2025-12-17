@@ -1,6 +1,27 @@
-FROM python:3.14-slim
+# Build arguments for image selection (defaults to DHI)
+ARG BUILD_IMAGE=dhi.io/python:3.14-alpine3.22-sfw-dev
+ARG RUNTIME_IMAGE=dhi.io/python:3.14-alpine3.22
+ARG DENO_IMAGE=denoland/deno:bin-2.6.0
+
+# Deno binary source (for yt-dlp YouTube extraction)
+# See: https://github.com/yt-dlp/yt-dlp/wiki/EJS
+FROM ${DENO_IMAGE} AS deno_src
+
+# Stage 1: Build dependencies
+FROM ${BUILD_IMAGE} AS builder
+
+WORKDIR /app
+
+# Copy requirements and install dependencies to isolated directory
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir --target=/deps -r requirements.txt
+
+# Stage 2: Runtime
+FROM ${RUNTIME_IMAGE}
 
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/deps
+ENV PATH="/deps/bin:$PATH"
 
 WORKDIR /app
 
@@ -8,13 +29,10 @@ WORKDIR /app
 EXPOSE 8000
 
 # Install Deno runtime (required for yt-dlp YouTube extraction)
-# See: https://github.com/yt-dlp/yt-dlp/wiki/EJS
-# Using official Deno binary image: https://github.com/denoland/deno_docker
-COPY --from=denoland/deno:bin-2.6.0 /deno /usr/local/bin/deno
+COPY --from=deno_src /deno /usr/local/bin/deno
 
-# Copy requirements and install dependencies
-COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+# Copy installed dependencies from builder
+COPY --from=builder /deps /deps
 
 # Copy source code
 COPY src/ ./src/
