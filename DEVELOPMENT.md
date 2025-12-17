@@ -27,13 +27,13 @@ Docker Compose is recommended for local development as it rebuilds from source:
 
 ```bash
 # Start the service
-docker-compose up -d
+docker compose up -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Restart after code changes
-docker-compose down && docker-compose up -d --build
+docker compose down && docker compose up -d --build
 ```
 
 **Playlist URL:** `http://localhost:23457/playlist.m3u8`
@@ -49,6 +49,29 @@ scripts/run.sh
 # Build without cache (clean build)
 scripts/run.sh --no-cache
 ```
+
+## Docker Hardened Images (DHI)
+
+This project uses [Docker Hardened Images](https://www.docker.com/blog/docker-hardened-images-for-every-developer/) in CI/production for enhanced security. DHI images are minimal, pre-hardened containers with reduced attack surface.
+
+### Local Development
+
+Local development uses standard Python images (no authentication required). The `docker-compose.yml` overrides the Dockerfile defaults to use `python:3.14-slim`:
+
+```bash
+docker compose up -d
+```
+
+### CI/Production
+
+CI builds use DHI images from `dhi.io`, requiring authentication. Repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` must be configured in GitHub.
+
+### Image Variants
+
+| Stage   | Image                                    | Purpose                                  |
+|---------|------------------------------------------|------------------------------------------|
+| Build   | `dhi.io/python:3.14-alpine3.22-sfw-dev`  | Has pip for installing dependencies      |
+| Runtime | `dhi.io/python:3.14-alpine3.22`          | Minimal, no pip (reduced attack surface) |
 
 ## Pre-commit Hooks
 
@@ -129,10 +152,10 @@ This helps identify memory leaks from yt-dlp.
 
 ```bash
 # Ensure LOG_LEVEL=DEBUG is set in .env, then restart
-docker-compose down && docker-compose up -d
+docker compose down && docker compose up -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 ```
 
 ## Making Changes
