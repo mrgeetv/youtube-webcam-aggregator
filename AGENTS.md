@@ -47,7 +47,9 @@ Format: `type(scope): description`
 When adding or updating versioned dependencies (Python packages, GitHub Actions, pre-commit hooks, Docker images, etc.):
 
 1. Find the GitHub repo (WebSearch if URL unknown)
-2. Fetch GitHub releases page directly (WebFetch)
+2. Get latest version using one of:
+   - `gh release list --repo owner/repo --limit 5` (preferred when repo is known)
+   - WebFetch on GitHub releases page (fallback)
 3. If version cannot be verified from GitHub, stop and ask user to confirm
 
 ## Pre-commit Behavior
