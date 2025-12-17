@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.0](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.0.7...v1.1.0) (2025-12-17)
+
+
+### Features
+
+* **docker:** migrate to Docker Hardened Images with multi-stage build ([#20](https://github.com/mrgeetv/youtube-webcam-aggregator/issues/20)) ([02beec5](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/02beec540c1382c9d9c38f299389eae508cb82f3))
+
 ## [1.0.7](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.0.6...v1.0.7) (2025-12-13)
 
 
