@@ -38,6 +38,19 @@ docker compose down && docker compose up -d --build
 
 **Playlist URL:** `http://localhost:23457/playlist.m3u8`
 
+### Environment Variables
+
+Configure these in your `.env` file or pass directly to docker-compose:
+
+| Variable | Default | Description |
+| -------- | ------- | ----------- |
+| `YOUTUBE_API_KEY` | (required) | YouTube Data API v3 key |
+| `LOG_LEVEL` | `INFO` | Logging verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+| `UPDATE_INTERVAL_HOURS` | `5` | Hours between playlist refresh cycles |
+| `MAX_VIDEOS_PER_CYCLE` | `1000` | Maximum videos to process per cycle (memory limit) |
+| `EXCLUDED_CATEGORIES` | `Gaming,Sports,Film & Animation,Howto & Style` | YouTube categories to exclude |
+| `SEARCH_QUERY` | (see docker-compose.yml) | Search terms for finding live webcams |
+
 ### Using the Run Script
 
 A helper script is provided for common operations:
