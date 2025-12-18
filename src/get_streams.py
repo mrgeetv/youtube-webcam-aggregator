@@ -9,6 +9,7 @@ and filters out unwanted content based on configurable exclusions.
 import asyncio
 import gc
 import http.server
+import json
 import logging
 import os
 import random
@@ -471,18 +472,50 @@ async def main() -> None:
             await asyncio.sleep(60)
 
 
-def run_http_server(port: int = 8000) -> None:
-    """
-    Start HTTP server in daemon thread to serve playlist files.
+class PlaylistHandler(http.server.BaseHTTPRequestHandler):
+    """Secure HTTP handler serving only playlist and health endpoints."""
 
-    Args:
-        port: Port number for HTTP server (default: 8000)
-    """
-    handler = http.server.SimpleHTTPRequestHandler
-    httpd = socketserver.TCPServer(("", port), handler)
+    def log_message(self, format, *args):
+        """Route HTTP logs through our logger."""
+        logger.debug(f"HTTP: {args[0]}")
+
+    def do_GET(self):
+        if self.path == "/playlist.m3u8":
+            self._serve_playlist()
+        elif self.path == "/health":
+            self._serve_health()
+        else:
+            self.send_error(404, "Not Found")
+
+    def _serve_playlist(self):
+        playlist_path = Path("playlist.m3u8")
+        if not playlist_path.exists():
+            self.send_error(503, "Playlist not ready")
+            return
+        content = playlist_path.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/vnd.apple.mpegurl")
+        self.send_header("Content-Length", len(content))
+        self.end_headers()
+        self.wfile.write(content)
+
+    def _serve_health(self):
+        process = psutil.Process(os.getpid())
+        mem_mb = process.memory_info().rss / 1024 / 1024
+        health = {"status": "ok", "memory_mb": round(mem_mb, 1)}
+        content = json.dumps(health).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", len(content))
+        self.end_headers()
+        self.wfile.write(content)
+
+
+def run_http_server(port: int = 8000) -> None:
+    """Start HTTP server in daemon thread."""
+    httpd = socketserver.TCPServer(("", port), PlaylistHandler)
     logger.info(f"HTTP server started on port {port}")
-    thread = threading.Thread(target=httpd.serve_forever)
-    thread.daemon = True
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
 
 
