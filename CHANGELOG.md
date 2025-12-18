@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.3](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.2...v1.1.3) (2025-12-18)
+
+### Bug Fixes
+
+* **docker:** secure HTTP handler and add health endpoint ([#24](https://github.com/mrgeetv/youtube-webcam-aggregator/issues/24)) ([84011ad](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/84011adaf26294782a91a4b6fc999f374a015f2c))
+
 ## [1.1.2](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.1...v1.1.2) (2025-12-18)
 
 ### Bug Fixes
