@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.2](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.1...v1.1.2) (2025-12-18)
+
+### Bug Fixes
+
+* **api:** add retry with exponential backoff for transient errors ([#23](https://github.com/mrgeetv/youtube-webcam-aggregator/issues/23)) ([2d26e4e](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/2d26e4eb867c33819d097417ae0e820a38ecdb43))
+
 ## [1.1.1](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.0...v1.1.1) (2025-12-18)
 
 ### Bug Fixes
