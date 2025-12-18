@@ -7,6 +7,7 @@ and filters out unwanted content based on configurable exclusions.
 """
 
 import asyncio
+import gc
 import http.server
 import logging
 import os
@@ -53,6 +54,14 @@ try:
 except ValueError as e:
     logger.error(f"Invalid UPDATE_INTERVAL_HOURS: {e}")
     UPDATE_INTERVAL_HOURS = 5
+
+try:
+    MAX_VIDEOS_PER_CYCLE = int(os.getenv("MAX_VIDEOS_PER_CYCLE", "1000"))
+    if MAX_VIDEOS_PER_CYCLE < 100:
+        raise ValueError("MAX_VIDEOS_PER_CYCLE must be at least 100")
+except ValueError as e:
+    logger.error(f"Invalid MAX_VIDEOS_PER_CYCLE: {e}")
+    MAX_VIDEOS_PER_CYCLE = 1000
 
 
 def log_memory_usage() -> None:
@@ -123,6 +132,9 @@ def create_youtube_client() -> Any:
     """
     Create and return a YouTube Data API client.
 
+    Uses cache_discovery=False to prevent memory accumulation from
+    cached discovery documents across cycles.
+
     Returns:
         Configured YouTube API client
 
@@ -130,7 +142,7 @@ def create_youtube_client() -> Any:
         Exception: If client initialization fails
     """
     try:
-        return build("youtube", "v3", developerKey=API_KEY)
+        return build("youtube", "v3", developerKey=API_KEY, cache_discovery=False)
     except Exception as e:
         logger.error(f"YouTube client init failed: {e}")
         raise
@@ -149,9 +161,13 @@ def get_categories(youtube: Any) -> Dict[str, str]:
     try:
         request = youtube.videoCategories().list(part="snippet", regionCode="US")
         response = request.execute()
-        return {
+        categories = {
             item["id"]: item["snippet"]["title"] for item in response.get("items", [])
         }
+        # Cleanup response objects to free memory
+        del response
+        del request
+        return categories
     except HttpError as e:
         logger.error(f"Category fetch failed: {e}")
         return {}
@@ -174,24 +190,31 @@ def clean_title(title: str) -> str:
     return re.sub(r"\s+", " ", title).strip()
 
 
-def get_live_webcams(youtube: Any) -> List[str]:
+def get_live_webcams(youtube: Any, max_videos: int = None) -> List[str]:
     """
     Search for live webcam streams on YouTube.
 
     Performs paginated search using the configured search query and returns
-    video IDs of live streams.
+    video IDs of live streams. Respects MAX_VIDEOS_PER_CYCLE limit to prevent
+    unbounded memory growth.
 
     Args:
         youtube: YouTube API client
+        max_videos: Maximum videos to collect (defaults to MAX_VIDEOS_PER_CYCLE)
 
     Returns:
         List of YouTube video IDs for live streams
     """
+    if max_videos is None:
+        max_videos = MAX_VIDEOS_PER_CYCLE
+
     video_ids = []
     published_before = None
+    batch_count = 0
 
     try:
-        while True:
+        while len(video_ids) < max_videos:
+            batch_count += 1
             params = {
                 "part": "id,snippet",
                 "type": "video",
@@ -213,10 +236,28 @@ def get_live_webcams(youtube: Any) -> List[str]:
 
             new_ids = [item["id"]["videoId"] for item in items]
             video_ids.extend(new_ids)
+
+            # Enforce limit
+            if len(video_ids) >= max_videos:
+                video_ids = video_ids[:max_videos]
+                logger.info(f"Reached video limit ({max_videos})")
+                # Cleanup before break
+                del response
+                del items
+                del request
+                break
+
             published_before = items[-1]["snippet"]["publishedAt"]
             logger.info(
-                f"Batch fetch complete: +{len(new_ids)} videos, total: {len(video_ids)}"
+                f"Batch {batch_count}: +{len(new_ids)} videos, "
+                f"total: {len(video_ids)}/{max_videos}"
             )
+
+            # Cleanup response objects to free memory
+            del response
+            del items
+            del request
+
             if not new_ids:
                 logger.info("No new videos found in this batch")
                 break
@@ -252,17 +293,23 @@ def get_video_details(
         Each video info dict contains 'title' and 'stream_url' keys.
     """
     categorized_results = defaultdict(list)
+    total_batches = (len(video_ids) + 49) // 50
 
     for i in range(0, len(video_ids), 50):
         chunk = video_ids[i : i + 50]
-        logger.info(f"Processing batch {i + 1}-{i + len(chunk)}/{len(video_ids)}")
+        batch_num = (i // 50) + 1
+        logger.info(
+            f"Processing batch {batch_num}/{total_batches}: "
+            f"videos {i + 1}-{i + len(chunk)}/{len(video_ids)}"
+        )
         log_memory_usage()
 
         try:
             request = youtube.videos().list(part="snippet", id=",".join(chunk))
             response = request.execute()
+            items = response.get("items", [])
 
-            for item in response.get("items", []):
+            for item in items:
                 category = categories.get(item["snippet"]["categoryId"], "Unknown")
                 title = clean_title(item["snippet"]["title"])
 
@@ -279,8 +326,13 @@ def get_video_details(
                     {"title": title, "stream_url": stream_url}
                 )
 
+            # Cleanup response objects to free memory
+            del items
+            del response
+            del request
+
         except HttpError as e:
-            logger.error(f"Batch processing failed: {e}")
+            logger.error(f"Batch {batch_num} failed: {e}")
 
     for category in categorized_results:
         categorized_results[category].sort(key=lambda x: x["title"].lower())
@@ -301,6 +353,7 @@ def generate_playlist() -> bool:
     """
     temp_playlist = Path("playlist.m3u8.tmp")
     final_playlist = Path("playlist.m3u8")
+    youtube = None
 
     try:
         youtube = create_youtube_client()
@@ -317,12 +370,14 @@ def generate_playlist() -> bool:
 
         categorized_results = get_video_details(youtube, video_ids, categories)
 
+        stream_count = sum(len(v) for v in categorized_results.values())
         with open(temp_playlist, "w", encoding="utf-8") as playlist_file:
             playlist_file.write("#EXTM3U\n")
             playlist_file.write("# Generated by YouTube Webcam Scraper\n")
             playlist_file.write(
-                f"# Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                f"# Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
             )
+            playlist_file.write(f"# Streams: {stream_count}\n\n")
 
             for category, videos in categorized_results.items():
                 for video in videos:
@@ -331,7 +386,7 @@ def generate_playlist() -> bool:
                     )
 
         os.replace(temp_playlist, final_playlist)
-        logger.info(f"Playlist updated: {final_playlist}")
+        logger.info(f"Playlist updated: {stream_count} streams")
         return True
 
     except Exception as e:
@@ -340,24 +395,40 @@ def generate_playlist() -> bool:
             temp_playlist.unlink()
         return False
 
+    finally:
+        # Cleanup YouTube client to free HTTP connections and caches
+        if youtube is not None:
+            try:
+                if hasattr(youtube, "_http") and youtube._http:
+                    youtube._http.close()
+                logger.debug("Closed YouTube client")
+            except Exception as e:
+                logger.debug(f"Error closing YouTube client: {e}")
+            del youtube
+
 
 async def main() -> None:
     """
     Main service loop that periodically generates webcam playlists.
 
     Starts HTTP server for playlist serving and runs continuous update cycle
-    at configured intervals.
+    at configured intervals. Forces garbage collection between cycles to
+    prevent memory accumulation.
     """
     logger.info("Scraper service starting")
     logger.info(f"Using search query: {SEARCH_QUERY}")
     logger.info(f"Excluded categories: {', '.join(sorted(EXCLUDED_CATEGORIES))}")
     logger.info(f"Update interval: {UPDATE_INTERVAL_HOURS} hours")
+    logger.info(f"Max videos per cycle: {MAX_VIDEOS_PER_CYCLE}")
     run_http_server()
 
+    cycle_count = 0
     while True:
         try:
-            logger.info("Starting scrape cycle")
+            cycle_count += 1
+            logger.info(f"Starting scrape cycle #{cycle_count}")
             log_memory_usage()
+
             success = generate_playlist()
 
             if success:
@@ -366,11 +437,18 @@ async def main() -> None:
                 logger.warning("Cycle completed with errors")
 
             log_memory_usage()
+
+            # Force garbage collection between cycles to prevent memory accumulation
+            collected = gc.collect()
+            logger.debug(f"Garbage collection freed {collected} objects")
+            log_memory_usage()
+
             logger.info(f"Sleeping for {UPDATE_INTERVAL_HOURS} hours")
             await asyncio.sleep(3600 * UPDATE_INTERVAL_HOURS)
 
         except Exception as e:
             logger.error(f"Main loop error: {e}")
+            gc.collect()  # Also collect on error
             await asyncio.sleep(60)
 
 

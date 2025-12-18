@@ -1,5 +1,11 @@
 # Project: YouTube Live Webcam Aggregator
 
+> **Note**: CLAUDE.md is a symlink to this file. Edit AGENTS.md only.
+
+## Development Context
+
+@DEVELOPMENT.md
+
 ## Branching Workflow
 
 For any new work (fixes, features, chores, etc.):
