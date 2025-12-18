@@ -11,9 +11,11 @@ import gc
 import http.server
 import logging
 import os
+import random
 import re
 import socketserver
 import threading
+import time
 import unicodedata
 from collections import defaultdict
 from datetime import datetime
@@ -62,6 +64,24 @@ try:
 except ValueError as e:
     logger.error(f"Invalid MAX_VIDEOS_PER_CYCLE: {e}")
     MAX_VIDEOS_PER_CYCLE = 1000
+
+RETRYABLE_STATUS_CODES = (429, 500, 502, 503, 504)
+
+
+def retry_api_call(func, max_retries: int = 3, base_delay: float = 1.0):
+    """Retry API call with exponential backoff on transient errors."""
+    for attempt in range(max_retries + 1):
+        try:
+            return func()
+        except HttpError as e:
+            status = e.resp.status if hasattr(e, "resp") else None
+            if status not in RETRYABLE_STATUS_CODES or attempt == max_retries:
+                raise
+            delay = min(base_delay * (2**attempt), 30.0) + random.random()
+            logger.warning(
+                f"API error {status}, retry {attempt + 1}/{max_retries} in {delay:.1f}s"
+            )
+            time.sleep(delay)
 
 
 def log_memory_usage() -> None:
@@ -160,11 +180,10 @@ def get_categories(youtube: Any) -> Dict[str, str]:
     """
     try:
         request = youtube.videoCategories().list(part="snippet", regionCode="US")
-        response = request.execute()
+        response = retry_api_call(request.execute)
         categories = {
             item["id"]: item["snippet"]["title"] for item in response.get("items", [])
         }
-        # Cleanup response objects to free memory
         del response
         del request
         return categories
@@ -227,7 +246,7 @@ def get_live_webcams(youtube: Any, max_videos: int = None) -> List[str]:
                 params["publishedBefore"] = published_before
 
             request = youtube.search().list(**params)
-            response = request.execute()
+            response = retry_api_call(request.execute)
             items = response.get("items", [])
 
             if not items:
@@ -306,7 +325,7 @@ def get_video_details(
 
         try:
             request = youtube.videos().list(part="snippet", id=",".join(chunk))
-            response = request.execute()
+            response = retry_api_call(request.execute)
             items = response.get("items", [])
 
             for item in items:
