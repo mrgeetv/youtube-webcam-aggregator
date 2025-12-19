@@ -48,6 +48,7 @@ Configure these in your `.env` file or pass directly to docker-compose:
 | `LOG_LEVEL` | `INFO` | Logging verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `UPDATE_INTERVAL_HOURS` | `5` | Hours between playlist refresh cycles |
 | `MAX_VIDEOS_PER_CYCLE` | `1000` | Maximum videos to process per cycle (memory limit) |
+| `CONCURRENT_EXTRACTIONS` | `5` | Parallel yt-dlp extractions (lower if hitting 429s) |
 | `EXCLUDED_CATEGORIES` | `Gaming,Sports,Film & Animation,Howto & Style` | YouTube categories to exclude |
 | `SEARCH_QUERY` | (see docker-compose.yml) | Search terms for finding live webcams |
 
@@ -131,7 +132,7 @@ youtube-webcam-aggregator/
 - **Internal port:** 8000 (hardcoded in Python application)
 - **Docker Compose port:** 23457 (mapped from 8000)
 
-The HTTP server uses Python's built-in `http.server.SimpleHTTPRequestHandler` to serve the generated playlist file.
+The HTTP server uses a custom handler serving only `/playlist.m3u8` and `/health` endpoints.
 
 ## Debugging
 
