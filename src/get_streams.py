@@ -19,6 +19,7 @@ import threading
 import time
 import unicodedata
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TextIO
@@ -65,6 +66,14 @@ try:
 except ValueError as e:
     logger.error(f"Invalid MAX_VIDEOS_PER_CYCLE: {e}")
     MAX_VIDEOS_PER_CYCLE = 1000
+
+try:
+    CONCURRENT_EXTRACTIONS = int(os.getenv("CONCURRENT_EXTRACTIONS", "5"))
+    if CONCURRENT_EXTRACTIONS < 1:
+        raise ValueError("CONCURRENT_EXTRACTIONS must be at least 1")
+except ValueError as e:
+    logger.error(f"Invalid CONCURRENT_EXTRACTIONS: {e}")
+    CONCURRENT_EXTRACTIONS = 5
 
 RETRYABLE_STATUS_CODES = (429, 500, 502, 503, 504)
 
@@ -300,8 +309,8 @@ def get_video_details(
     """
     Fetch detailed information for videos and organize by category.
 
-    Retrieves video metadata, extracts stream URLs, and groups results by
-    YouTube category while filtering out excluded categories.
+    Retrieves video metadata, extracts stream URLs in parallel, and groups
+    results by YouTube category while filtering out excluded categories.
 
     Args:
         youtube: YouTube API client
@@ -329,22 +338,37 @@ def get_video_details(
             response = retry_api_call(request.execute)
             items = response.get("items", [])
 
+            # Filter items and prepare for parallel extraction
+            videos_to_extract = []
             for item in items:
                 category = categories.get(item["snippet"]["categoryId"], "Unknown")
-                title = clean_title(item["snippet"]["title"])
-
                 if category in EXCLUDED_CATEGORIES:
                     logger.debug(f"Skipped excluded category: {category}")
                     continue
-
-                stream_url = get_youtube_stream_url(item["id"])
-                if not stream_url:
-                    continue
-
-                logger.info(f"Added stream: {title}")
-                categorized_results[category].append(
-                    {"title": title, "stream_url": stream_url}
+                title = clean_title(item["snippet"]["title"])
+                videos_to_extract.append(
+                    {"id": item["id"], "title": title, "category": category}
                 )
+
+            # Extract stream URLs in parallel
+            if videos_to_extract:
+                logger.info(
+                    f"Extracting {len(videos_to_extract)} streams "
+                    f"({CONCURRENT_EXTRACTIONS} concurrent)"
+                )
+                with ThreadPoolExecutor(max_workers=CONCURRENT_EXTRACTIONS) as executor:
+                    future_to_video = {
+                        executor.submit(get_youtube_stream_url, v["id"]): v
+                        for v in videos_to_extract
+                    }
+                    for future in as_completed(future_to_video):
+                        video = future_to_video[future]
+                        stream_url = future.result()
+                        if stream_url:
+                            logger.info(f"Added stream: {video['title']}")
+                            categorized_results[video["category"]].append(
+                                {"title": video["title"], "stream_url": stream_url}
+                            )
 
             # Cleanup response objects to free memory
             del items
@@ -440,6 +464,7 @@ async def main() -> None:
     logger.info(f"Excluded categories: {', '.join(sorted(EXCLUDED_CATEGORIES))}")
     logger.info(f"Update interval: {UPDATE_INTERVAL_HOURS} hours")
     logger.info(f"Max videos per cycle: {MAX_VIDEOS_PER_CYCLE}")
+    logger.info(f"Concurrent extractions: {CONCURRENT_EXTRACTIONS}")
     run_http_server()
 
     cycle_count = 0
