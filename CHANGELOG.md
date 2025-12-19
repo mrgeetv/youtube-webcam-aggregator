@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.4](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.3...v1.1.4) (2025-12-19)
+
+### Bug Fixes
+
+* **deps:** bump the python-dependencies group with 2 updates ([#25](https://github.com/mrgeetv/youtube-webcam-aggregator/issues/25)) ([5f293b6](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/5f293b60d25bfa4f91f214009cebd89e1b707bb4))
+
+### Performance Improvements
+
+* **scraper:** parallelize stream extraction with ThreadPoolExecutor ([#26](https://github.com/mrgeetv/youtube-webcam-aggregator/issues/26)) ([6cf6087](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/6cf6087f67530e73252549e6a155dc05aa0f4624))
+
 ## [1.1.3](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.2...v1.1.3) (2025-12-18)
 
 ### Bug Fixes
