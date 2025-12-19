@@ -22,7 +22,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TextIO
+from typing import Any, Callable, TextIO, TypeVar, override
 
 import psutil
 import subprocess
@@ -77,8 +77,12 @@ except ValueError as e:
 
 RETRYABLE_STATUS_CODES = (429, 500, 502, 503, 504)
 
+T = TypeVar("T")
 
-def retry_api_call(func, max_retries: int = 3, base_delay: float = 1.0):
+
+def retry_api_call(
+    func: Callable[[], T], max_retries: int = 3, base_delay: float = 1.0
+) -> T:
     """Retry API call with exponential backoff on transient errors."""
     for attempt in range(max_retries + 1):
         try:
@@ -92,6 +96,7 @@ def retry_api_call(func, max_retries: int = 3, base_delay: float = 1.0):
                 f"API error {status}, retry {attempt + 1}/{max_retries} in {delay:.1f}s"
             )
             time.sleep(delay)
+    raise RuntimeError("Retry loop completed without returning or raising")
 
 
 def log_memory_usage() -> None:
@@ -104,7 +109,7 @@ def log_memory_usage() -> None:
     logger.debug(f"Memory: {mem_mb:.0f} MB")
 
 
-def get_youtube_stream_url(video_id: str) -> Optional[str]:
+def get_youtube_stream_url(video_id: str) -> str | None:
     """
     Extract the direct stream URL for a YouTube video using yt-dlp subprocess.
 
@@ -178,7 +183,7 @@ def create_youtube_client() -> Any:
         raise
 
 
-def get_categories(youtube: Any) -> Dict[str, str]:
+def get_categories(youtube: Any) -> dict[str, str]:
     """
     Fetch YouTube video categories for the US region.
 
@@ -219,7 +224,7 @@ def clean_title(title: str) -> str:
     return re.sub(r"\s+", " ", title).strip()
 
 
-def get_live_webcams(youtube: Any, max_videos: int = None) -> List[str]:
+def get_live_webcams(youtube: Any, max_videos: int | None = None) -> list[str]:
     """
     Search for live webcam streams on YouTube.
 
@@ -304,8 +309,8 @@ def get_live_webcams(youtube: Any, max_videos: int = None) -> List[str]:
 
 
 def get_video_details(
-    youtube: Any, video_ids: List[str], categories: Dict[str, str]
-) -> Dict[str, List[Dict[str, str]]]:
+    youtube: Any, video_ids: list[str], categories: dict[str, str]
+) -> dict[str, list[dict[str, str]]]:
     """
     Fetch detailed information for videos and organize by category.
 
@@ -500,11 +505,12 @@ async def main() -> None:
 class PlaylistHandler(http.server.BaseHTTPRequestHandler):
     """Secure HTTP handler serving only playlist and health endpoints."""
 
-    def log_message(self, format, *args):
+    @override
+    def log_message(self, format: str, *args: object) -> None:
         """Route HTTP logs through our logger."""
         logger.debug(f"HTTP: {args[0]}")
 
-    def do_GET(self):
+    def do_GET(self) -> None:
         if self.path == "/playlist.m3u8":
             self._serve_playlist()
         elif self.path == "/health":
@@ -512,7 +518,7 @@ class PlaylistHandler(http.server.BaseHTTPRequestHandler):
         else:
             self.send_error(404, "Not Found")
 
-    def _serve_playlist(self):
+    def _serve_playlist(self) -> None:
         playlist_path = Path("playlist.m3u8")
         if not playlist_path.exists():
             self.send_error(503, "Playlist not ready")
@@ -520,18 +526,18 @@ class PlaylistHandler(http.server.BaseHTTPRequestHandler):
         content = playlist_path.read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", "application/vnd.apple.mpegurl")
-        self.send_header("Content-Length", len(content))
+        self.send_header("Content-Length", str(len(content)))
         self.end_headers()
         self.wfile.write(content)
 
-    def _serve_health(self):
+    def _serve_health(self) -> None:
         process = psutil.Process(os.getpid())
         mem_mb = process.memory_info().rss / 1024 / 1024
         health = {"status": "ok", "memory_mb": round(mem_mb, 1)}
         content = json.dumps(health).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", len(content))
+        self.send_header("Content-Length", str(len(content)))
         self.end_headers()
         self.wfile.write(content)
 

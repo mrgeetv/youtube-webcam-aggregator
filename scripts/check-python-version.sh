@@ -3,10 +3,12 @@
 # - .python-version (source of truth)
 # - Dockerfile ARG defaults (DHI images for CI)
 # - docker-compose.yml build args (standard images for local dev)
+# - pyrightconfig.json pythonVersion (type checker)
 
 PYTHON_VERSION_FILE=".python-version"
 DOCKERFILE="Dockerfile"
 COMPOSE_FILE="docker-compose.yml"
+PYRIGHT_CONFIG="pyrightconfig.json"
 
 # Read expected version from .python-version
 if [[ ! -f "$PYTHON_VERSION_FILE" ]]; then
@@ -47,6 +49,21 @@ if [[ "$EXPECTED_VERSION" != "$COMPOSE_VERSION" ]]; then
     echo "  .python-version:      $EXPECTED_VERSION"
     echo "  docker-compose.yml:   $COMPOSE_VERSION"
     exit 1
+fi
+
+# Check pyrightconfig.json pythonVersion (if file exists)
+if [[ -f "$PYRIGHT_CONFIG" ]]; then
+    PYRIGHT_VERSION=$(grep -E '"pythonVersion"' "$PYRIGHT_CONFIG" | sed -E 's/.*"([0-9]+\.[0-9]+)".*/\1/')
+    if [[ -z "$PYRIGHT_VERSION" ]]; then
+        echo "Error: Could not extract pythonVersion from $PYRIGHT_CONFIG"
+        exit 1
+    fi
+    if [[ "$EXPECTED_VERSION" != "$PYRIGHT_VERSION" ]]; then
+        echo "❌ Python version mismatch in pyrightconfig.json!"
+        echo "  .python-version:      $EXPECTED_VERSION"
+        echo "  pyrightconfig.json:   $PYRIGHT_VERSION"
+        exit 1
+    fi
 fi
 
 echo "✅ Python versions match: $EXPECTED_VERSION"

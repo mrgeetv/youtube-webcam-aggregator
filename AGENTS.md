@@ -94,7 +94,8 @@ Pre-commit hooks enforced:
 - **markdownlint-cli2** - Markdown formatting (CHANGELOG.md excluded)
 - **hadolint** - Dockerfile linting
 - **conventional-pre-commit** - Commit message validation (strict mode with forced scopes)
-- **check-python-version** - Custom validation that .python-version matches Dockerfile
+- **check-python-version** - Custom validation that .python-version matches Dockerfile, docker-compose.yml, and pyrightconfig.json
+- **basedpyright** - Python type checking (stricter pyright fork with pylance features)
 
 ## Python Version Synchronization
 
@@ -102,6 +103,8 @@ This project enforces Python version consistency:
 
 - `.python-version` - Source of truth (currently 3.14)
 - `Dockerfile` - Must use `FROM python:{version}-slim` matching .python-version
+- `docker-compose.yml` - Must have RUNTIME_IMAGE arg matching .python-version
+- `pyrightconfig.json` - Must have `pythonVersion` matching .python-version
 - Pre-commit hook validates synchronization automatically
 - CI uses .python-version for GitHub Actions Python setup
 
@@ -109,5 +112,7 @@ This project enforces Python version consistency:
 
 1. Update `.python-version` file
 2. Update `Dockerfile` FROM line to match
-3. Pre-commit hook validates consistency
-4. Test Docker build before committing
+3. Update `docker-compose.yml` RUNTIME_IMAGE arg to match
+4. Update `pyrightconfig.json` pythonVersion to match
+5. Pre-commit hook validates consistency
+6. Test Docker build before committing
