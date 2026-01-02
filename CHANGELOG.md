@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.5](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.4...v1.1.5) (2026-01-02)
+
+### Bug Fixes
+
+* **deps:** bump docker/setup-buildx-action from 3.11.1 to 3.12.0 ([#28](https://github.com/mrgeetv/youtube-webcam-aggregator/issues/28)) ([31243fc](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/31243fc34aebcfe645448b335e81e5a7724c58c9))
+* **deps:** bump the python-dependencies group across 1 directory with 2 updates ([#30](https://github.com/mrgeetv/youtube-webcam-aggregator/issues/30)) ([3f5db49](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/3f5db4935a028266e0dad5ccf7049c2051d83599))
+
 ## [1.1.4](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.3...v1.1.4) (2025-12-19)
 
 ### Bug Fixes
