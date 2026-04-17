@@ -48,7 +48,7 @@ Configure these in your `.env` file or pass directly to docker-compose:
 | `LOG_LEVEL` | `INFO` | Logging verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `UPDATE_INTERVAL_HOURS` | `5` | Hours between playlist refresh cycles |
 | `MAX_VIDEOS_PER_CYCLE` | `1000` | Maximum videos to process per cycle (memory limit) |
-| `CONCURRENT_EXTRACTIONS` | `5` | Parallel yt-dlp extractions (lower if hitting 429s) |
+| `CONCURRENT_EXTRACTIONS` | `1` | Parallel yt-dlp extractions (raise cautiously; YouTube aggressively flags concurrent requests as bots) |
 | `EXCLUDED_CATEGORIES` | `Gaming,Sports,Film & Animation,Howto & Style` | YouTube categories to exclude |
 | `SEARCH_QUERY` | (see docker-compose.yml) | Search terms for finding live webcams |
 

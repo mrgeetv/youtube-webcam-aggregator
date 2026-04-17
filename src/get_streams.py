@@ -68,12 +68,12 @@ except ValueError as e:
     MAX_VIDEOS_PER_CYCLE = 1000
 
 try:
-    CONCURRENT_EXTRACTIONS = int(os.getenv("CONCURRENT_EXTRACTIONS", "5"))
+    CONCURRENT_EXTRACTIONS = int(os.getenv("CONCURRENT_EXTRACTIONS", "1"))
     if CONCURRENT_EXTRACTIONS < 1:
         raise ValueError("CONCURRENT_EXTRACTIONS must be at least 1")
 except ValueError as e:
     logger.error(f"Invalid CONCURRENT_EXTRACTIONS: {e}")
-    CONCURRENT_EXTRACTIONS = 5
+    CONCURRENT_EXTRACTIONS = 1
 
 RETRYABLE_STATUS_CODES = (429, 500, 502, 503, 504)
 
