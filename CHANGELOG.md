@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.14](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.13...v1.1.14) (2026-04-17)
+
+### Bug Fixes
+
+* **scraper:** lower default CONCURRENT_EXTRACTIONS to 1 ([#53](https://github.com/mrgeetv/youtube-webcam-aggregator/issues/53)) ([d05c24f](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/d05c24f6580dec294dbec3b39ab5cea3ee3cef3e))
+
 ## [1.1.13](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.12...v1.1.13) (2026-04-17)
 
 ### Bug Fixes
