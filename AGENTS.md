@@ -14,6 +14,10 @@ For any new work (fixes, features, chores, etc.):
 2. Create new branch from main
 3. Make changes and commit
 
+A Claude Code `PreToolUse` hook in `.claude/settings.json` enforces this
+by blocking `git commit` when the current branch is `main` or `master`.
+The hook script lives at `.claude/hooks/block-commit-to-main.sh`.
+
 ## Conventional Commit Format
 
 Format: `type(scope): description`
