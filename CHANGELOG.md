@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.15](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.14...v1.1.15) (2026-04-24)
+
+### Bug Fixes
+
+* **deps:** bump the python-dependencies group with 2 updates ([#55](https://github.com/mrgeetv/youtube-webcam-aggregator/issues/55)) ([e0ba112](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/e0ba112f75b080f47bd3d959a561db1978def5a2))
+
 ## [1.1.14](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.13...v1.1.14) (2026-04-17)
 
 ### Bug Fixes
