@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.16](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.15...v1.1.16) (2026-05-01)
+
+### Bug Fixes
+
+* **deps:** bump google-api-python-client ([#56](https://github.com/mrgeetv/youtube-webcam-aggregator/issues/56)) ([427c888](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/427c8888d767a3584eed165497a3edb36fdcfda0))
+
 ## [1.1.15](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.14...v1.1.15) (2026-04-24)
 
 ### Bug Fixes
