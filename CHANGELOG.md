@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.18](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.17...v1.1.18) (2026-05-22)
+
+### Bug Fixes
+
+* **deps:** bump docker/build-push-action from 7.1.0 to 7.2.0 ([#58](https://github.com/mrgeetv/youtube-webcam-aggregator/issues/58)) ([b873307](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/b8733071f82a81a1f4b69dc8d3ad433ee0b53217))
+* **deps:** bump the python-dependencies group with 2 updates ([#59](https://github.com/mrgeetv/youtube-webcam-aggregator/issues/59)) ([a63a6e7](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/a63a6e7178a6a56ea4e2b07ff089b059676866f0))
+
 ## [1.1.17](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.16...v1.1.17) (2026-05-08)
 
 ### Bug Fixes
