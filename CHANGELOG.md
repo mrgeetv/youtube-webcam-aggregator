@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.20](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.19...v1.1.20) (2026-06-05)
+
+### Bug Fixes
+
+* **deps:** bump actions/checkout from 6.0.2 to 6.0.3 ([#63](https://github.com/mrgeetv/youtube-webcam-aggregator/issues/63)) ([a984445](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/a984445953e29d314112d4c337777fac55478bcb))
+
 ## [1.1.19](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.18...v1.1.19) (2026-05-29)
 
 ### Bug Fixes
