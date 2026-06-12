@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.21](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.20...v1.1.21) (2026-06-12)
+
+### Bug Fixes
+
+* **deps:** bump yt-dlp in the python-dependencies group ([#64](https://github.com/mrgeetv/youtube-webcam-aggregator/issues/64)) ([396d792](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/396d792ba01f7e35546fc896e5fe1287999f64b8))
+
 ## [1.1.20](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.19...v1.1.20) (2026-06-05)
 
 ### Bug Fixes
