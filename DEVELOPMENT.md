@@ -84,8 +84,8 @@ CI builds use DHI images from `dhi.io`, requiring authentication. Repository sec
 
 | Stage   | Image                                    | Purpose                                  |
 |---------|------------------------------------------|------------------------------------------|
-| Build   | `dhi.io/python:3.14-alpine3.22-sfw-dev`  | Has pip for installing dependencies      |
-| Runtime | `dhi.io/python:3.14-alpine3.22`          | Minimal, no pip (reduced attack surface) |
+| Build   | `dhi.io/python:3.14-alpine3.24-sfw-dev`  | Has pip for installing dependencies      |
+| Runtime | `dhi.io/python:3.14-alpine3.24`          | Minimal, no pip (reduced attack surface) |
 
 ## Pre-commit Hooks
 
