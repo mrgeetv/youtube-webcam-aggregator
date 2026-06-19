@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.23](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.22...v1.1.23) (2026-06-19)
+
+### Bug Fixes
+
+* **scraper:** make deno JS runtime functional + commit-hook fix ([#66](https://github.com/mrgeetv/youtube-webcam-aggregator/issues/66)) ([4d45974](https://github.com/mrgeetv/youtube-webcam-aggregator/commit/4d459740f2b1f5dfdb99afd98dc2ee0d3e52c186))
+
 ## [1.1.22](https://github.com/mrgeetv/youtube-webcam-aggregator/compare/v1.1.21...v1.1.22) (2026-06-19)
 
 ### Bug Fixes
