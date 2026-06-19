@@ -1,11 +1,21 @@
 # Build arguments for image selection (defaults to DHI)
-ARG BUILD_IMAGE=dhi.io/python:3.14-alpine3.22-sfw-dev
-ARG RUNTIME_IMAGE=dhi.io/python:3.14-alpine3.22
-ARG DENO_IMAGE=denoland/deno:bin-2.6.0
+ARG BUILD_IMAGE=dhi.io/python:3.14-alpine3.24-sfw-dev
+ARG RUNTIME_IMAGE=dhi.io/python:3.14-alpine3.24
+ARG DENO_IMAGE=denoland/deno:alpine-2.8.3
 
 # Deno binary source (for yt-dlp YouTube extraction)
 # See: https://github.com/yt-dlp/yt-dlp/wiki/EJS
+#
+# Deno ships as a glibc binary with its loader hardcoded to /lib64. Repoint its
+# ELF interpreter and rpath at the bundled glibc so it runs self-contained,
+# without a system /lib64 loader. This lets it exec on the musl Alpine runtime
+# (DHI) while NOT hijacking the system loader on a glibc runtime (local compose
+# uses python:3.14-slim / Debian) — copying glibc over /lib64 breaks the latter.
 FROM ${DENO_IMAGE} AS deno_src
+# hadolint ignore=DL3018  # patchelf is a build-only tool; pinning it across deno base bumps is fragile
+RUN apk add --no-cache patchelf \
+ && patchelf --set-interpreter /usr/local/lib/glibc/ld-linux-x86-64.so.2 \
+             --set-rpath /usr/local/lib/glibc /bin/deno
 
 # Stage 1: Build dependencies
 FROM ${BUILD_IMAGE} AS builder
@@ -28,8 +38,11 @@ WORKDIR /app
 # Expose HTTP server port
 EXPOSE 8000
 
-# Install Deno runtime (required for yt-dlp YouTube extraction)
-COPY --from=deno_src /deno /usr/local/bin/deno
+# Install Deno runtime (required for yt-dlp YouTube extraction). The binary was
+# patched (in deno_src) to use its own bundled glibc, so it execs on the musl
+# Alpine runtime without a system /lib64 loader and without disturbing one.
+COPY --from=deno_src /bin/deno /usr/local/bin/deno
+COPY --from=deno_src /usr/local/lib/glibc /usr/local/lib/glibc
 
 # Copy installed dependencies from builder
 COPY --from=builder /deps /deps

@@ -7,8 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/block-commit-to-main.sh",
-            "if": "Bash(git commit*)"
+            "command": "bash .claude/hooks/block-commit-to-main.sh"
           }
         ]
       }
