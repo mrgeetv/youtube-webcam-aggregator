@@ -6,7 +6,7 @@ from dataclasses import replace
 
 from ..fetch import FetcherProtocol, thread_map
 from ..models import Candidate
-from .base import extract_candidates
+from .base import extract_candidates, with_location
 
 _SLUG = re.compile(r"live-camera/([^<\s]+)")
 _TITLE = re.compile(r"<h1[^>]*>([^<]{1,120})</h1>")
@@ -32,7 +32,9 @@ class CxtvliveSource:
                 continue
             tm = _TITLE.search(html)
             cm = _CATEGORY.search(html)
-            title = tm.group(1).strip() if tm else slug.replace("-", " ").title()
+            title = with_location(
+                tm.group(1).strip() if tm else slug.replace("-", " ").title(), url
+            )
             category = cm.group(1).replace("-", " ").title() if cm else None
             for c in extract_candidates(html, page_url=url, source="cxtvlive"):
                 yield replace(c, title=title, category=category)

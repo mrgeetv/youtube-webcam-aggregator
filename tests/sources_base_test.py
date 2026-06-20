@@ -1,4 +1,31 @@
-from webcam_aggregator.sources.base import extract_candidates
+from webcam_aggregator.sources.base import (
+    extract_candidates,
+    location_from_url,
+    with_location,
+)
+
+
+def test_location_from_url():
+    base = "https://worldcams.tv"
+    assert location_from_url(f"{base}/italy/venice/rialto-bridge") == "Venice, Italy"
+    assert location_from_url(f"{base}/barbados/barbados-beaches") == "Barbados"
+    assert (
+        location_from_url("https://www.cxtvlive.com/live-camera/yosemite-falls")
+        == "Yosemite Falls"
+    )
+    assert location_from_url("https://worldcams.tv/") == ""
+
+
+def test_with_location_appends_and_dedupes():
+    url = "https://worldcams.tv/italy/cinque-terre/beach"
+    # generic title gains the location
+    assert with_location("Italy Beaches Webcam", url) == (
+        "Italy Beaches Webcam — Cinque Terre, Italy"
+    )
+    # no double-up when the title already names the place
+    assert with_location("Cinque Terre, Italy cam", url) == "Cinque Terre, Italy cam"
+    # empty title falls back to the location alone
+    assert with_location("", url) == "Cinque Terre, Italy"
 
 
 def test_ignores_source_attribution_link():

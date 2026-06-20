@@ -14,7 +14,10 @@ class _FakeFetcher:
         return self._pages.get(url)
 
 
-_LIST = '<div class="cam-promo__title"><a href="/x/cam-a">A</a></div>'
+_LIST = (
+    '<div class="cam-promo__title">'
+    '<a href="/norway/finse/railroad-station">A</a></div>'
+)
 _CAM = (
     "<h1>Finse Railroad</h1>"
     'Category: &nbsp;<a href="/trains/">Trains</a>'
@@ -26,13 +29,14 @@ def test_discovers_with_title_and_category() -> None:
     pages = {
         "https://worldcams.tv/list/?page=1": _LIST,
         "https://worldcams.tv/list/?page=2": "",  # empty → stop
-        "https://worldcams.tv/x/cam-a": _CAM,
+        "https://worldcams.tv/norway/finse/railroad-station": _CAM,
     }
     fetcher: FetcherProtocol = _FakeFetcher(pages)
     cands = list(WorldcamsSource(fetch=fetcher).discover())
     assert cands
     assert all(c.source == "worldcams" for c in cands)
-    assert cands[0].title == "Finse Railroad"
+    # location from the URL path is appended for geographic context
+    assert cands[0].title == "Finse Railroad — Finse, Norway"
     assert cands[0].category == "Trains"
     assert cands[0].predisc_key == "yt:aaaaaaaaaaa"
 

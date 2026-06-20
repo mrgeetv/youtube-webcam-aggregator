@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Iterator
 from typing import Protocol
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 from ..models import Candidate
 
@@ -57,6 +57,33 @@ def _predisc_key(target: str) -> str | None:
         norm = re.sub(r"[?&](token|expire|hdnts|st|e)=[^&]*", "", t).rstrip("?&")
         return f"hls:{norm}"
     return None
+
+
+def location_from_url(page_url: str) -> str:
+    """Geographic hint from a scraped cam URL path.
+
+    worldcams /<country>/<place>/<name> -> "Place, Country"; /<country>/<name> ->
+    "Country". cxtvlive /live-camera/<slug> -> "Slug".
+    """
+    path = urlsplit(page_url).path.strip("/")
+    pretty = [
+        s.replace("-", " ").title() for s in path.split("/") if s and s != "live-camera"
+    ]
+    if len(pretty) >= 3:
+        return f"{pretty[1]}, {pretty[0]}"
+    if pretty:
+        return pretty[0]
+    return ""
+
+
+def with_location(title: str, page_url: str) -> str:
+    """Append the URL-derived location unless the title already names it."""
+    loc = location_from_url(page_url)
+    if not title.strip():
+        return loc or title
+    if loc and loc.lower() not in title.lower():
+        return f"{title} — {loc}"
+    return title
 
 
 def extract_candidates(html: str, *, page_url: str, source: str) -> Iterator[Candidate]:

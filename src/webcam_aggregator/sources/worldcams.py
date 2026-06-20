@@ -6,7 +6,7 @@ from dataclasses import replace
 
 from ..fetch import FetcherProtocol, thread_map
 from ..models import Candidate
-from .base import extract_candidates
+from .base import extract_candidates, with_location
 
 _MAX_LIST_PAGES = 80
 _LINKS = re.compile(r'class="cam-promo__title"[^>]*>\s*<a href="([^"]+)"')
@@ -40,7 +40,7 @@ class WorldcamsSource:
                 continue
             tm = _TITLE.search(html)
             cm = _CATEGORY.search(html)
-            title = tm.group(1).strip() if tm else ""
+            title = with_location(tm.group(1).strip() if tm else "", url)
             category = cm.group(2).strip() if cm else None
             for c in extract_candidates(html, page_url=url, source="worldcams"):
                 yield replace(c, title=title, category=category)
