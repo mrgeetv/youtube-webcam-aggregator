@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 
 from webcam_aggregator import config
@@ -53,3 +55,38 @@ def test_exclude_categories_parsed_casefolded():
 
 def test_exclude_categories_default_empty():
     assert config.load({"YOUTUBE_API_KEY": "k"}).exclude_categories == frozenset()
+
+
+def test_bad_log_level_warns(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING, logger="webcam-aggregator.config"):
+        config.load({"YOUTUBE_API_KEY": "k", "LOG_LEVEL": "VERBOSE"})
+    assert "LOG_LEVEL" in caplog.text
+
+
+def test_localhost_public_base_url_warns(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING, logger="webcam-aggregator.config"):
+        config.load({"YOUTUBE_API_KEY": "k"})
+    assert "PUBLIC_BASE_URL" in caplog.text
+
+
+def test_non_localhost_public_base_url_no_warn(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.WARNING, logger="webcam-aggregator.config"):
+        config.load(
+            {"YOUTUBE_API_KEY": "k", "PUBLIC_BASE_URL": "https://cams.example.com"}
+        )
+    assert "PUBLIC_BASE_URL" not in caplog.text
+
+
+def test_bad_catalogue_interval_warns(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING, logger="webcam-aggregator.config"):
+        bad = config.load({"YOUTUBE_API_KEY": "k", "CATALOGUE_INTERVAL_HOURS": "x"})
+    assert bad.catalogue_interval_hours == 6
+    assert "CATALOGUE_INTERVAL_HOURS" in caplog.text
+
+
+def test_unknown_exclude_category_warns(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING, logger="webcam-aggregator.config"):
+        config.load({"YOUTUBE_API_KEY": "k", "EXCLUDE_CATEGORIES": "Relgion"})
+    assert "relgion" in caplog.text.lower()

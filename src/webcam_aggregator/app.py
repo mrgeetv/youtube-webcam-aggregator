@@ -360,7 +360,6 @@ def build_app(
 
 
 def main() -> None:
-    cfg = config.load()
     # Root stays at WARNING so third-party libs (googleapiclient, urllib3) never
     # log request URLs at DEBUG — those carry the API key as a query param. Only
     # our own loggers honour LOG_LEVEL.
@@ -368,6 +367,7 @@ def main() -> None:
         level=logging.WARNING,
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
+    cfg = config.load()
     logging.getLogger("webcam-aggregator").setLevel(
         getattr(logging, cfg.log_level, logging.INFO)
     )

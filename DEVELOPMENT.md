@@ -206,6 +206,11 @@ source collapse (empty-guard). At `DEBUG`, it also logs dropped/failed resolves 
 liveness-probe failures. Live process memory (`rss_mb`) and per-source counts are
 exposed on the `/health` endpoint.
 
+Suspect config logs a `WARNING` at startup rather than failing silently: a non-numeric
+`CATALOGUE_INTERVAL_HOURS`/`PORT`/`SCRAPE_WORKERS`, an unknown `LOG_LEVEL`, a
+`localhost` `PUBLIC_BASE_URL` (unreachable by remote players), or an unknown name in
+`EXCLUDE_CATEGORIES`.
+
 Memory peaks **during** the catalogue build (it fetches + liveness-checks every
 source concurrently) and settles back down once the playlist is built — the build is
 the high-water mark, not a leak. Lower `SCRAPE_WORKERS` to reduce that peak.

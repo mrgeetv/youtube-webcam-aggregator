@@ -67,3 +67,10 @@ def map_category(raw: str | None) -> str:
 ALL_CATEGORIES: tuple[str, ...] = tuple(
     sorted(set(_MAP.values()) | _NATIVE_YT | {"Other"})
 )
+
+_ALL_CASEFOLDED: frozenset[str] = frozenset(c.casefold() for c in ALL_CATEGORIES)
+
+
+def unknown_categories(names: frozenset[str]) -> frozenset[str]:
+    """Casefolded names that aren't real categories — likely typos in EXCLUDE_CATEGORIES."""
+    return frozenset(n for n in names if n.casefold() not in _ALL_CASEFOLDED)

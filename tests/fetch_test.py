@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import logging
 import socket
 from unittest.mock import patch
 
 import pytest
 
-from webcam_aggregator.fetch import Fetcher, is_safe_url
+from webcam_aggregator.fetch import Fetcher, is_safe_url, resolve_scrape_workers
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -459,3 +460,33 @@ def test_post_refuses_redirect(monkeypatch: pytest.MonkeyPatch) -> None:
     assert (
         f.post("https://example.com/wp-admin/admin-ajax.php", {"action": "x"}) is None
     )
+
+
+# ---------------------------------------------------------------------------
+# _scrape_workers — bad env values warn and fall back to default
+# ---------------------------------------------------------------------------
+
+
+def test_scrape_workers_bad_value_warns_and_returns_default(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setenv("SCRAPE_WORKERS", "abc")
+    with caplog.at_level(logging.WARNING, logger="webcam-aggregator.fetch"):
+        result = resolve_scrape_workers()
+    import os
+
+    expected_default = min(16, (os.cpu_count() or 2) * 4)
+    assert result == expected_default
+    assert "SCRAPE_WORKERS" in caplog.text
+
+
+def test_scrape_workers_valid_value_no_warning(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setenv("SCRAPE_WORKERS", "6")
+    with caplog.at_level(logging.WARNING, logger="webcam-aggregator.fetch"):
+        result = resolve_scrape_workers()
+    assert result == 6
+    assert caplog.text == ""

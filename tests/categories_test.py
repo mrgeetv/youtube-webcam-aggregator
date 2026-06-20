@@ -1,4 +1,4 @@
-from webcam_aggregator.categories import map_category
+from webcam_aggregator.categories import map_category, unknown_categories
 
 
 def test_known_mappings():
@@ -28,6 +28,16 @@ def test_all_categories_set():
     assert "Travel & Events" in ALL_CATEGORIES  # native YouTube, passes through
     assert "Other" in ALL_CATEGORIES  # fallback
     assert list(ALL_CATEGORIES) == sorted(ALL_CATEGORIES)  # stable, sorted order
+
+
+def test_unknown_categories_returns_empty_for_valid():
+    assert unknown_categories(frozenset({"animals", "religion"})) == frozenset()
+
+
+def test_unknown_categories_returns_typos():
+    assert unknown_categories(frozenset({"relgion", "animals"})) == frozenset(
+        {"relgion"}
+    )
 
 
 def test_readme_documents_every_category():
