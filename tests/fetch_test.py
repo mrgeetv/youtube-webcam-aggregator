@@ -3,7 +3,9 @@ from __future__ import annotations
 import socket
 from unittest.mock import patch
 
-from webcam_aggregator.fetch import is_safe_url
+import pytest
+
+from webcam_aggregator.fetch import Fetcher, is_safe_url
 
 
 # ---------------------------------------------------------------------------
@@ -97,3 +99,42 @@ def test_is_safe_url_blocks_multicast() -> None:
         return_value=_mock_getaddrinfo("224.0.0.1"),
     ):
         assert is_safe_url("http://multicast.example/") is False
+
+
+# ---------------------------------------------------------------------------
+# Fetcher — redirects are followed manually, each hop re-validated
+# ---------------------------------------------------------------------------
+
+
+def test_fetcher_does_not_follow_redirect_to_private(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def addrinfo(host: str, *_a: object, **_k: object) -> list[tuple[object, ...]]:
+        ip = "127.0.0.1" if host == "127.0.0.1" else "93.184.216.34"
+        return [(None, None, None, None, (ip, 0))]
+
+    fetched: list[str] = []
+
+    class _Resp:
+        is_redirect: bool = True
+        is_permanent_redirect: bool = False
+        headers: dict[str, str] = {"Location": "http://127.0.0.1/secret"}
+
+        def raise_for_status(self) -> None: ...
+
+        def iter_content(self, _n: int) -> object:
+            return iter(())
+
+        def close(self) -> None: ...
+
+    def fake_get(_self: object, url: str, **_k: object) -> _Resp:
+        fetched.append(url)
+        return _Resp()
+
+    monkeypatch.setattr("webcam_aggregator.fetch.socket.getaddrinfo", addrinfo)
+    monkeypatch.setattr("requests.Session.get", fake_get)
+
+    f = Fetcher(delay=0.0, retries=1)
+    # public start → 302 to a private host → must NOT be fetched, returns None
+    assert f.get("https://public.example/p.m3u8") is None
+    assert fetched == ["https://public.example/p.m3u8"]

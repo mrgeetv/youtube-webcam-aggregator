@@ -33,6 +33,27 @@ log = logging.getLogger("webcam-aggregator")
 _HLS_CT = "application/vnd.apple.mpegurl"
 
 
+class SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Re-check every redirect hop with is_safe_url (block internal-host SSRF)."""
+
+    @override
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: Any,
+        headers: Any,
+        newurl: str,
+    ) -> urllib.request.Request | None:
+        if not is_safe_url(newurl):
+            return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(SafeRedirectHandler())
+
+
 def origin_of(url: str) -> str:
     p = urllib.parse.urlsplit(url)
     return f"{p.scheme}://{p.hostname}/"
@@ -42,7 +63,7 @@ def _http_get(url: str) -> str:
     if not is_safe_url(url):
         raise ValueError(f"unsafe url: {url}")
     req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=20) as r:
+    with _OPENER.open(req, timeout=20) as r:
         data = r.read(MAX_BYTES + 1)
         if len(data) > MAX_BYTES:
             raise ValueError(f"response too large from {url}")
@@ -59,7 +80,7 @@ def _http_post(url: str, data: dict[str, str]) -> str:
         "Referer": origin_of(url),
     }
     req = urllib.request.Request(url, data=body, headers=headers)
-    with urllib.request.urlopen(req, timeout=20) as r:
+    with _OPENER.open(req, timeout=20) as r:
         resp_data = r.read(MAX_BYTES + 1)
         if len(resp_data) > MAX_BYTES:
             raise ValueError(f"response too large from {url}")

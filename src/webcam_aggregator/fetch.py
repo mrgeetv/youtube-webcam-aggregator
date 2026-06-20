@@ -4,13 +4,14 @@ import ipaddress
 import socket
 import time
 from typing import Protocol
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import requests
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
 MAX_BYTES = 8 * 1024 * 1024  # 8 MB ceiling for any fetched document
+_MAX_REDIRECTS = 5
 
 
 def is_safe_url(url: str) -> bool:
@@ -53,23 +54,43 @@ class Fetcher:
         self._session.headers["User-Agent"] = UA
 
     def get(self, url: str, timeout: float = 20.0) -> str | None:
-        if not is_safe_url(url):
-            return None
         for attempt in range(self._retries):
             try:
-                resp = self._session.get(url, timeout=timeout, stream=True)
-                resp.raise_for_status()
-                chunks: list[bytes] = []
-                total = 0
-                for chunk in resp.iter_content(8192):
-                    total += len(chunk)
-                    if total > MAX_BYTES:
-                        return None  # oversized → refuse
-                    chunks.append(chunk)
+                body = self._fetch_following(url, timeout)
                 time.sleep(self._delay)
-                return b"".join(chunks).decode("utf-8", "replace")
+                return body
             except requests.RequestException:
                 if attempt == self._retries - 1:
                     return None
                 time.sleep(2**attempt)
         return None
+
+    def _fetch_following(self, url: str, timeout: float) -> str | None:
+        # Follow redirects manually so EVERY hop is re-checked by is_safe_url.
+        # requests' own redirect following would skip the guard and let an
+        # upstream 302 us at an internal host (SSRF).
+        current = url
+        for _hop in range(_MAX_REDIRECTS):
+            if not is_safe_url(current):
+                return None
+            resp = self._session.get(
+                current, timeout=timeout, stream=True, allow_redirects=False
+            )
+            if resp.is_redirect or resp.is_permanent_redirect:
+                location = resp.headers.get("Location")
+                resp.close()
+                if not location:
+                    return None
+                current = urljoin(current, location)
+                continue
+            resp.raise_for_status()
+            chunks: list[bytes] = []
+            total = 0
+            for chunk in resp.iter_content(8192):
+                total += len(chunk)
+                if total > MAX_BYTES:
+                    resp.close()
+                    return None  # oversized → refuse
+                chunks.append(chunk)
+            return b"".join(chunks).decode("utf-8", "replace")
+        return None  # too many redirects
