@@ -18,13 +18,11 @@ _TRACKING = {
 @dataclass(frozen=True)
 class Candidate:
     title: str
-    angle_label: str | None
     angle_key: str | None
     category: str | None
     source: str
     source_page_url: str
     target_url: str
-    hint: str | None
     predisc_key: str | None
 
 
@@ -36,7 +34,6 @@ class CatalogueEntry:
     source: str
     source_page_url: str
     target_url: str
-    resolver_hint: str | None
 
 
 def _canonical_url(url: str) -> str:

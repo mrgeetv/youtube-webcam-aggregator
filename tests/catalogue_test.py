@@ -21,17 +21,14 @@ def _make_candidate(
     target: str = "https://example.com/stream1.m3u8",
     title: str = "Test Cam",
     category: str | None = None,
-    hint: str | None = None,
 ) -> Candidate:
     return Candidate(
         title=title,
-        angle_label=None,
         angle_key=None,
         category=category,
         source=source,
         source_page_url=page,
         target_url=target,
-        hint=hint,
         predisc_key=key,
     )
 

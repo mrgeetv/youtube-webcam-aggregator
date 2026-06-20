@@ -58,13 +58,11 @@ def test_is_alive_fetch_verifies_hls() -> None:
 
     cand = Candidate(
         title="x",
-        angle_label=None,
         angle_key=None,
         category=None,
         source="s",
         source_page_url="https://x/p",
         target_url="https://x/p.m3u8",
-        hint=None,
         predisc_key=None,
     )
     assert make_is_alive(resolve, lambda u: "#EXTM3U\nseg.ts\n")(cand) is True

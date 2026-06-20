@@ -35,7 +35,6 @@ def _entry(
         source="test",
         source_page_url="https://origin.example/cam",
         target_url=target_url,
-        resolver_hint=None,
     )
 
 

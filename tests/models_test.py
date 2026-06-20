@@ -4,13 +4,11 @@ from webcam_aggregator.models import Candidate, stable_id
 def _c(page: str, angle: str | None = None, target: str = "x") -> Candidate:
     return Candidate(
         title="t",
-        angle_label=None,
         angle_key=angle,
         category=None,
         source="cxtvlive",
         source_page_url=page,
         target_url=target,
-        hint=None,
         predisc_key=None,
     )
 

@@ -120,12 +120,10 @@ def extract_candidates(html: str, *, page_url: str, source: str) -> Iterator[Can
         seen.add(target)
         yield Candidate(
             title="",
-            angle_label=None,
             angle_key=str(idx) if multi else None,
             category=None,
             source=source,
             source_page_url=page_url,
             target_url=target,
-            hint=None,
             predisc_key=_predisc_key(target),
         )

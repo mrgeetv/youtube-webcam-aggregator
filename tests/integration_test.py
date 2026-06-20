@@ -21,13 +21,11 @@ _YT_URL = f"https://www.youtube.com/watch?v={_YT_VID}"
 
 _CANDIDATE = Candidate(
     title="Cam A",
-    angle_label=None,
     angle_key=None,
     category="Beaches",
     source="fake",
     source_page_url="https://fake.example/cam/1",
     target_url=_YT_URL,
-    hint="youtube",
     predisc_key=f"yt:{_YT_VID}",
 )
 

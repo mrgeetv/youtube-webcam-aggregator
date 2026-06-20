@@ -26,13 +26,11 @@ _BASE_URL = "http://localhost"
 
 _CANDIDATE = Candidate(
     title="Test Cam",
-    angle_label=None,
     angle_key=None,
     category="Nature",
     source="fake",
     source_page_url="https://fake.example/cam/2",
     target_url=_YT_URL,
-    hint="youtube",
     predisc_key=f"yt:{_YT_VID}",
 )
 

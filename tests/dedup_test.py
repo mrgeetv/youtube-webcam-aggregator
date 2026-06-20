@@ -12,13 +12,11 @@ def _c(
 ) -> Candidate:
     return Candidate(
         title=title,
-        angle_label=None,
         angle_key=angle,
         category=cat,
         source=source,
         source_page_url=page,
         target_url="u",
-        hint=None,
         predisc_key=key,
     )
 

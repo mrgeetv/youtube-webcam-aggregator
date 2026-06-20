@@ -113,7 +113,7 @@ def make_resolve(
     registry: Registry, extractors: dict[str, Extractor]
 ) -> Callable[[str, str], Resolved]:
     def resolve(_entry_id: str, target_url: str) -> Resolved:
-        name = registry.match(target_url, resolve_redirect=lambda u: u)
+        name = registry.match(target_url)
         if name is None:
             log.debug("no extractor matched target %s", target_url)
             raise ValueError(f"no extractor for {target_url}")

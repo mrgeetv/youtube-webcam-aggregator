@@ -62,13 +62,11 @@ class YoutubeApiSource:
                 n += 1
                 yield Candidate(
                     title=it["snippet"]["title"],
-                    angle_label=None,
                     angle_key=None,
                     category=None,
                     source="youtube-api",
                     source_page_url=f"https://www.youtube.com/watch?v={vid}",
                     target_url=f"https://www.youtube.com/watch?v={vid}",
-                    hint="youtube",
                     predisc_key=f"yt:{vid}",
                 )
             token = resp.get("nextPageToken")

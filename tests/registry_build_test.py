@@ -15,7 +15,7 @@ _EXTRACTORS: dict[str, Extractor] = {
 
 
 def _route(url: str) -> str | None:
-    return build_registry(_EXTRACTORS).match(url, resolve_redirect=lambda u: u)
+    return build_registry(_EXTRACTORS).match(url)
 
 
 def test_real_registry_predicates():

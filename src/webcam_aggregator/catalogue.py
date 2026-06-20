@@ -31,7 +31,6 @@ def _to_entry(c: Candidate) -> CatalogueEntry:
         source=c.source,
         source_page_url=c.source_page_url,
         target_url=c.target_url,
-        resolver_hint=c.hint,
     )
 
 
