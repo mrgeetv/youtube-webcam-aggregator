@@ -39,20 +39,42 @@ The same camera found on more than one source is merged into a single channel.
 - A YouTube Data API v3 key (free with a Google account). In the
   [Google Cloud Console](https://console.cloud.google.com/apis/credentials): create
   a project, enable *YouTube Data API v3*, then create an API key.
-- Docker and Docker Compose installed.
+- Docker.
 
 ### Run
 
+Pull and run the published image:
+
 ```bash
-git clone https://github.com/mrgeetv/youtube-webcam-aggregator.git
-cd youtube-webcam-aggregator
-cp .env.example .env          # then edit .env and set YOUTUBE_API_KEY
-docker compose up -d
+docker run -d --name webcams \
+  -p 23457:8000 \
+  -e YOUTUBE_API_KEY=your_key_here \
+  -e PUBLIC_BASE_URL=http://localhost:23457 \
+  ghcr.io/mrgeetv/youtube-webcam-aggregator:v2
+```
+
+Or with a minimal `docker-compose.yml` (uses the published image — no build):
+
+```yaml
+services:
+  webcams:
+    image: ghcr.io/mrgeetv/youtube-webcam-aggregator:v2
+    ports: ["23457:8000"]
+    environment:
+      YOUTUBE_API_KEY: your_key_here
+      PUBLIC_BASE_URL: http://localhost:23457
+    restart: unless-stopped
 ```
 
 The playlist is then available at `http://localhost:23457/playlist.m3u8`. The first
 catalogue build takes a few minutes (discovery + liveness checks); until it's ready,
 `/playlist.m3u8` returns `503`.
+
+Set `PUBLIC_BASE_URL` to the address your players actually reach — `localhost` only
+works for a player on the same machine (see *Exposing it*). These use the `:v2` major
+tag, so you get v2.x updates but never an automatic jump to a future breaking major
+(`:latest` would); see *Upgrading from v1*. Want to build from source instead? See
+[DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Adding it to a player
 
