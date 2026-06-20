@@ -6,7 +6,6 @@ import sys
 import threading
 import time
 import urllib.parse
-import urllib.request
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, override
@@ -22,7 +21,7 @@ from .extractors.direct_hls import DirectHls
 from .extractors.ipcamlive import IpcamliveResolver
 from .extractors.metatag import MetaTagExtractor
 from .extractors.ytdlp import YtDlpExtractor
-from .fetch import MAX_BYTES, UA, Fetcher, is_safe_url
+from .fetch import Fetcher, FetcherPostProtocol
 from .models import Candidate, CatalogueEntry
 from .registry import Registry
 from .serving import render_playlist, serve_child_manifest, serve_segment, serve_stream
@@ -34,58 +33,35 @@ log = logging.getLogger("webcam-aggregator")
 _HLS_CT = "application/vnd.apple.mpegurl"
 
 
-class SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
-    """Re-check every redirect hop with is_safe_url (block internal-host SSRF)."""
-
-    @override
-    def redirect_request(
-        self,
-        req: urllib.request.Request,
-        fp: Any,
-        code: int,
-        msg: Any,
-        headers: Any,
-        newurl: str,
-    ) -> urllib.request.Request | None:
-        if not is_safe_url(newurl):
-            return None
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
-
-
-_OPENER = urllib.request.build_opener(SafeRedirectHandler())
-
-
 def origin_of(url: str) -> str:
     p = urllib.parse.urlsplit(url)
     return f"{p.scheme}://{p.hostname}/"
 
 
-def _http_get(url: str) -> str:
-    if not is_safe_url(url):
-        raise ValueError(f"unsafe url: {url}")
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with _OPENER.open(req, timeout=20) as r:
-        data = r.read(MAX_BYTES + 1)
-        if len(data) > MAX_BYTES:
-            raise ValueError(f"response too large from {url}")
-        return data.decode("utf-8", "replace")
+def _resolver_get(fetcher: Fetcher) -> Callable[[str], str]:
+    def get_text(url: str) -> str:
+        body = fetcher.get(url)
+        if body is None:
+            raise ValueError(f"resolver fetch failed: {url}")
+        return body
+
+    return get_text
 
 
-def _http_post(url: str, data: dict[str, str]) -> str:
-    if not is_safe_url(url):
-        raise ValueError(f"unsafe url: {url}")
-    body = urllib.parse.urlencode(data).encode()
-    headers = {
-        "User-Agent": UA,
-        "X-Requested-With": "XMLHttpRequest",
-        "Referer": origin_of(url),
-    }
-    req = urllib.request.Request(url, data=body, headers=headers)
-    with _OPENER.open(req, timeout=20) as r:
-        resp_data = r.read(MAX_BYTES + 1)
-        if len(resp_data) > MAX_BYTES:
-            raise ValueError(f"response too large from {url}")
-        return resp_data.decode("utf-8", "replace")
+def _baltic_post(fetcher: FetcherPostProtocol) -> Callable[[str, dict[str, str]], str]:
+    def post(url: str, data: dict[str, str]) -> str:
+        # baltic's admin-ajax POST needs an XHR header and Referer = the SITE
+        # ORIGIN (not the ajax URL) or it 403s silently.
+        body = fetcher.post(
+            url,
+            data,
+            headers={"X-Requested-With": "XMLHttpRequest", "Referer": origin_of(url)},
+        )
+        if body is None:
+            raise ValueError(f"resolver post failed: {url}")
+        return body
+
+    return post
 
 
 def _is_ytdlp(u: str) -> bool:
@@ -309,13 +285,15 @@ def build_app(
     Callable[[], dict[str, int]],
 ]:
     fetcher = Fetcher()
+    resolver_fetcher = Fetcher(delay=0.0, retries=2)
+    rget = _resolver_get(resolver_fetcher)
 
     extractors: dict[str, Extractor] = {
         "ytdlp": YtDlpExtractor(),
         "direct": DirectHls(),
-        "metatag": MetaTagExtractor(_http_get),
-        "baltic": BalticResolver(_http_get, _http_post),
-        "ipcamlive": IpcamliveResolver(_http_get),
+        "metatag": MetaTagExtractor(rget),
+        "baltic": BalticResolver(rget, _baltic_post(resolver_fetcher)),
+        "ipcamlive": IpcamliveResolver(rget),
     }
     registry = build_registry(extractors)
     resolve = make_resolve(registry, extractors)

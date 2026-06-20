@@ -365,3 +365,97 @@ def test_get_segment_oversized_returns_none(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr("requests.Session.get", lambda _self, _url, **_k: _BigSegResp())
     f = Fetcher(delay=0.0, retries=1)
     assert f.get_segment("https://cdn.example/seg.ts") is None
+
+
+# ---------------------------------------------------------------------------
+# Fetcher.post
+# ---------------------------------------------------------------------------
+
+
+def test_post_blocks_unsafe_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    """post must return None for private/loopback URLs without calling the session."""
+    monkeypatch.setattr(
+        "webcam_aggregator.fetch.socket.getaddrinfo",
+        lambda *_a, **_k: _mock_getaddrinfo("127.0.0.1"),
+    )
+    called = [False]
+
+    def fake_post(_self: object, _url: str, **_k: object) -> None:
+        called[0] = True
+
+    monkeypatch.setattr("requests.Session.post", fake_post)
+    f = Fetcher(delay=0.0, retries=1)
+    assert f.post("http://127.0.0.1/admin-ajax.php", {"action": "auth_token"}) is None
+    assert not called[0]
+
+
+def test_post_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A successful POST returns the decoded body and the call carried supplied headers and data."""
+    import urllib.parse
+
+    monkeypatch.setattr(
+        "webcam_aggregator.fetch.socket.getaddrinfo",
+        lambda *_a, **_k: _mock_getaddrinfo("93.184.216.34"),
+    )
+
+    captured_url: list[str] = []
+    captured_data: list[bytes] = []
+    captured_headers: list[dict[str, str]] = []
+
+    class _OkResp:
+        is_redirect: bool = False
+        is_permanent_redirect: bool = False
+
+        def raise_for_status(self) -> None: ...
+
+        def iter_content(self, _n: int) -> object:
+            return iter([b"response body"])
+
+        def close(self) -> None: ...
+
+    def fake_post(
+        _self: object, url: str, *, data: bytes, headers: dict[str, str], **_k: object
+    ) -> _OkResp:
+        captured_url.append(url)
+        captured_data.append(data)
+        captured_headers.append(headers)
+        return _OkResp()
+
+    monkeypatch.setattr("requests.Session.post", fake_post)
+    f = Fetcher(delay=0.0, retries=1)
+    result = f.post(
+        "https://example.com/wp-admin/admin-ajax.php",
+        {"action": "auth_token", "id": "42"},
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    assert result == "response body"
+    assert captured_url[0] == "https://example.com/wp-admin/admin-ajax.php"
+    # data must be url-encoded bytes
+    decoded = urllib.parse.parse_qs(captured_data[0].decode())
+    assert decoded["action"] == ["auth_token"]
+    assert decoded["id"] == ["42"]
+    # supplied headers must be forwarded
+    assert captured_headers[0]["X-Requested-With"] == "XMLHttpRequest"
+
+
+def test_post_refuses_redirect(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A redirect response from a POST must return None (admin-ajax shouldn't redirect)."""
+    monkeypatch.setattr(
+        "webcam_aggregator.fetch.socket.getaddrinfo",
+        lambda *_a, **_k: _mock_getaddrinfo("93.184.216.34"),
+    )
+
+    class _RedirectResp:
+        is_redirect: bool = True
+        is_permanent_redirect: bool = False
+        headers: dict[str, str] = {"Location": "https://other.example/login"}
+
+        def close(self) -> None: ...
+
+    monkeypatch.setattr(
+        "requests.Session.post", lambda _self, _url, **_k: _RedirectResp()
+    )
+    f = Fetcher(delay=0.0, retries=1)
+    assert (
+        f.post("https://example.com/wp-admin/admin-ajax.php", {"action": "x"}) is None
+    )

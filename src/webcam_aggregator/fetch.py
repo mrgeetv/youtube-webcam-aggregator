@@ -7,7 +7,7 @@ import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from typing import Protocol, TypeVar
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urlencode, urljoin, urlsplit
 
 import requests
 
@@ -72,6 +72,18 @@ def is_safe_url(url: str) -> bool:
 
 class FetcherProtocol(Protocol):
     def get(self, url: str, timeout: float = ..., /) -> str | None: ...
+
+
+class FetcherPostProtocol(Protocol):
+    def post(
+        self,
+        url: str,
+        data: dict[str, str],
+        /,
+        *,
+        headers: dict[str, str] | None = None,
+        timeout: float = ...,
+    ) -> str | None: ...
 
 
 class Fetcher:
@@ -157,3 +169,44 @@ class Fetcher:
             )
         except requests.RequestException:
             return None
+
+    def post(
+        self,
+        url: str,
+        data: dict[str, str],
+        *,
+        headers: dict[str, str] | None = None,
+        timeout: float = 20.0,
+    ) -> str | None:
+        if not is_safe_url(url):
+            return None
+        body = urlencode(data).encode()
+        for attempt in range(self._retries):
+            try:
+                resp = self._session.post(
+                    url,
+                    data=body,
+                    headers=headers or {},
+                    timeout=timeout,
+                    stream=True,
+                    allow_redirects=False,
+                )
+                time.sleep(self._delay)
+                if resp.is_redirect or resp.is_permanent_redirect:
+                    resp.close()
+                    return None  # admin-ajax POSTs shouldn't redirect; refuse
+                resp.raise_for_status()
+                chunks: list[bytes] = []
+                total = 0
+                for chunk in resp.iter_content(8192):
+                    total += len(chunk)
+                    if total > MAX_BYTES:
+                        resp.close()
+                        return None
+                    chunks.append(chunk)
+                return b"".join(chunks).decode("utf-8", "replace")
+            except requests.RequestException:
+                if attempt == self._retries - 1:
+                    return None
+                time.sleep(2**attempt)
+        return None

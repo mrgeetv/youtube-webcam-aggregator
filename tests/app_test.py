@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from webcam_aggregator.app import origin_of
 
 # ---------------------------------------------------------------------------
@@ -30,22 +32,39 @@ def test_origin_of_no_trailing_slash_duplication() -> None:
 
 
 # ---------------------------------------------------------------------------
-# SafeRedirectHandler — a redirect to an internal host must be refused
+# _baltic_post — Referer must be the SITE ORIGIN, not the ajax URL
 # ---------------------------------------------------------------------------
 
 
-def test_safe_redirect_handler_blocks_private_hosts() -> None:
-    import urllib.request
+def test_baltic_post_sends_xhr_and_site_origin_referer() -> None:
+    import webcam_aggregator.app as _app
 
-    from webcam_aggregator.app import SafeRedirectHandler
+    _baltic_post = _app._baltic_post  # pyright: ignore[reportPrivateUsage]
 
-    h = SafeRedirectHandler()
-    req = urllib.request.Request("https://example.com/")
-    # loopback and link-local (cloud metadata) redirect targets → refused (None)
-    assert h.redirect_request(req, None, 302, "msg", {}, "http://127.0.0.1/x") is None
-    assert (
-        h.redirect_request(req, None, 302, "msg", {}, "http://169.254.169.254/") is None
+    captured: dict[str, Any] = {}
+
+    class _FakeFetcher:
+        def post(
+            self,
+            _url: str,
+            _data: dict[str, str],
+            *,
+            headers: dict[str, str] | None = None,
+            timeout: float = 20.0,
+        ) -> str:
+            del timeout  # unused; present to satisfy FetcherPostProtocol signature
+            captured["headers"] = headers
+            return "ok"
+
+    out = _baltic_post(_FakeFetcher())(
+        "https://balticlivecam.com/wp-admin/admin-ajax.php", {"action": "auth_token"}
     )
+    assert out == "ok"
+    headers: dict[str, str] = captured["headers"]
+    assert (
+        headers["Referer"] == "https://balticlivecam.com/"
+    )  # site origin, NOT the ajax URL
+    assert headers["X-Requested-With"] == "XMLHttpRequest"
 
 
 def test_is_alive_fetch_verifies_hls() -> None:
