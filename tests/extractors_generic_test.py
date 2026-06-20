@@ -40,3 +40,16 @@ def test_ytdlp_parses_expire_ttl():
     assert out.stream_type == "hls"
     assert out.ttl_seconds is not None
     assert 5 * 3600 < out.ttl_seconds <= 6 * 3600
+
+
+def test_ytdlp_requests_hls_format():
+    captured: list[str] = []
+
+    def _run(argv: list[str]) -> str:
+        captured.extend(argv)
+        return "https://x.googlevideo.com/playlist.m3u8"
+
+    YtDlpExtractor(run=_run).resolve("https://www.youtube.com/watch?v=abc")
+    # must select an HLS-protocol format so we never get served a DASH .mpd
+    assert "-f" in captured
+    assert "m3u8" in captured[captured.index("-f") + 1]

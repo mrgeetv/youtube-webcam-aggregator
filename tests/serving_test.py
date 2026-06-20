@@ -189,6 +189,24 @@ def test_serve_stream_cache_miss_returns_502() -> None:
     assert status == 502
 
 
+def test_serve_stream_non_hls_manifest_returns_502() -> None:
+    # a DASH .mpd / XML / error body must not be served as HLS
+    resolved = Resolved(
+        url="https://x.googlevideo.com/manifest.mpd", stream_type="hls", ttl_seconds=60
+    )
+    cache = _make_cache(resolved)
+    entry = _entry()
+    status, _, body = serve_stream(
+        ENTRY_ID,
+        catalogue={ENTRY_ID: entry},
+        cache=cache,
+        fetch=lambda u: "<?xml version='1.0'?><MPD></MPD>",
+        base_url=BASE,
+    )
+    assert status == 502
+    assert b"HLS" in body
+
+
 def test_serve_stream_hls_returns_200_rewritten_body() -> None:
     manifest = "#EXTM3U\nrelative_chunk.m3u8\n"
     resolved = Resolved(

@@ -95,6 +95,10 @@ def serve_stream(
     if manifest is None:
         log.warning("manifest fetch failed: %s -> %s", entry_id, resolved.url)
         return (502, "text/plain", b"upstream manifest fetch failed")
+    if "#EXTM3U" not in manifest:
+        # Not HLS (e.g. a DASH .mpd or an error page) — don't serve it as HLS.
+        log.warning("non-HLS manifest: %s -> %s", entry_id, resolved.url)
+        return (502, "text/plain", b"not an HLS stream")
     body = rewrite_manifest(
         manifest,
         upstream_url=resolved.url,
