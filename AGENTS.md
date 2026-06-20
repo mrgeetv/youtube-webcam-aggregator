@@ -87,6 +87,11 @@ A Claude Code `PreToolUse` hook in `.claude/settings.json` enforces this
 by blocking `git commit` when the current branch is `main` or `master`.
 The hook script lives at `.claude/hooks/block-commit-to-main.sh`.
 
+`.claude/settings.json` also carries two **non-blocking** editing reminders: editing
+`requirements*.txt` recalls the dependency-version rule (check latest, pin new,
+never auto-bump existing); editing a `src/webcam_aggregator/*.py` module recalls to
+add/update the matching `*_test.py`.
+
 ## Conventional Commit Format
 
 Format: `type(scope): description`
