@@ -32,7 +32,6 @@ class Config:
     catalogue_interval_hours: int
     search_query: str
     log_level: str
-    port: int
     exclude_categories: frozenset[str]
 
 
@@ -93,7 +92,6 @@ def load(env: dict[str, str] | None = None) -> Config:
         catalogue_interval_hours=_int_env(e, "CATALOGUE_INTERVAL_HOURS", 6, 1),
         search_query=e.get("SEARCH_QUERY", "").strip() or _DEFAULT_SEARCH_QUERY,
         log_level=e.get("LOG_LEVEL", "INFO").strip().upper() or "INFO",
-        port=_int_env(e, "PORT", 8000, 1),
         exclude_categories=_csv_set(e.get("EXCLUDE_CATEGORIES", "")),
     )
     _warn_on_suspect_config(cfg)
