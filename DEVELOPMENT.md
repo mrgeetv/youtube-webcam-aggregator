@@ -12,8 +12,8 @@ This guide covers local development setup for contributors and developers who wa
 ### Clone and Configure
 
 ```bash
-git clone https://github.com/mrgeetv/youtube-webcam-aggregator.git
-cd youtube-webcam-aggregator
+git clone https://github.com/mrgeetv/live-webcam-aggregator.git
+cd live-webcam-aggregator
 
 # Copy environment template
 cp .env.example .env
@@ -143,7 +143,7 @@ the merge. Test files are named `*_test.py` (enforced by the `name-tests-test` h
 ## Project Structure
 
 ```text
-youtube-webcam-aggregator/
+live-webcam-aggregator/
 ├── src/
 │   └── webcam_aggregator/      # v2 application package
 │       ├── __main__.py         # Entry point (python -m webcam_aggregator)

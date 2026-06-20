@@ -143,7 +143,7 @@
     [
       "@semantic-release/github",
       {
-        "releaseBodyTemplate": "<%= nextRelease.notes %>\n\n## Container Image\n\nPull this release:\n```bash\ndocker pull ghcr.io/mrgeetv/youtube-webcam-aggregator:v<%= nextRelease.version %>\n```\n\n[View all tags on GitHub Container Registry](https://github.com/mrgeetv/youtube-webcam-aggregator/pkgs/container/youtube-webcam-aggregator)"
+        "releaseBodyTemplate": "<%= nextRelease.notes %>\n\n## Container Image\n\nPull this release:\n```bash\ndocker pull ghcr.io/mrgeetv/live-webcam-aggregator:v<%= nextRelease.version %>\n```\n\n[View all tags on GitHub Container Registry](https://github.com/mrgeetv/live-webcam-aggregator/pkgs/container/live-webcam-aggregator)"
       }
     ]
   ]

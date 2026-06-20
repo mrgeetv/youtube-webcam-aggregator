@@ -50,7 +50,7 @@ docker run -d --name webcams \
   -p 23457:8000 \
   -e YOUTUBE_API_KEY=your_key_here \
   -e PUBLIC_BASE_URL=http://localhost:23457 \
-  ghcr.io/mrgeetv/youtube-webcam-aggregator:v2
+  ghcr.io/mrgeetv/live-webcam-aggregator:v2
 ```
 
 Or with a minimal `docker-compose.yml` (uses the published image, no build):
@@ -58,7 +58,7 @@ Or with a minimal `docker-compose.yml` (uses the published image, no build):
 ```yaml
 services:
   webcams:
-    image: ghcr.io/mrgeetv/youtube-webcam-aggregator:v2
+    image: ghcr.io/mrgeetv/live-webcam-aggregator:v2
     ports: ["23457:8000"]
     environment:
       YOUTUBE_API_KEY: your_key_here
