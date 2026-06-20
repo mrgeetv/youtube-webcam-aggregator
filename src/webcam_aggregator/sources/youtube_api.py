@@ -41,36 +41,44 @@ class YoutubeApiSource:
         self._max = max_videos
 
     def discover(self) -> Iterator[Candidate]:
-        token: str | None = None
-        n = 0
-        while n < self._max:
+        # YouTube caps an eventType=live search at ~100 results via pageToken (it
+        # reports an inflated totalResults but returns an empty page 3). Paginate by
+        # walking backwards in time with publishedBefore instead — each window is a
+        # fresh query, so this reaches the deeper results (hundreds) tokens won't.
+        published_before: str | None = None
+        seen: set[str] = set()
+        while len(seen) < self._max:
+            params: dict[str, Any] = {
+                "part": "id,snippet",
+                "type": "video",
+                "eventType": "live",
+                "maxResults": 50,
+                "order": "date",
+                "q": self._query,
+            }
+            if published_before:
+                params["publishedBefore"] = published_before
             try:
-                resp = (
-                    self._c.search()
-                    .list(
-                        part="id,snippet",
-                        type="video",
-                        eventType="live",
-                        maxResults=50,
-                        order="date",
-                        q=self._query,
-                        pageToken=token,
-                    )
-                    .execute()
-                )
+                resp = self._c.search().list(**params).execute()
             except Exception as exc:
                 # Log the status only; the request URL carries the API key.
                 status = getattr(getattr(exc, "resp", None), "status", None)
                 log.warning(
                     "youtube search stopped after %d items (HTTP %s). Likely API "
                     "quota; raise the quota or narrow SEARCH_QUERY.",
-                    n,
+                    len(seen),
                     status if status is not None else "?",
                 )
                 return
-            for it in resp.get("items", []):
+            items = resp.get("items", [])
+            if not items:
+                break
+            before = len(seen)
+            for it in items:
                 vid = it["id"]["videoId"]
-                n += 1
+                if vid in seen:
+                    continue
+                seen.add(vid)
                 yield Candidate(
                     title=it["snippet"]["title"],
                     angle_key=None,
@@ -80,9 +88,10 @@ class YoutubeApiSource:
                     target_url=f"https://www.youtube.com/watch?v={vid}",
                     predisc_key=f"yt:{vid}",
                 )
-            token = resp.get("nextPageToken")
-            if not token:
-                break
+            next_before = items[-1].get("snippet", {}).get("publishedAt")
+            if len(seen) == before or not next_before:
+                break  # no new ids, or no timestamp to advance the window
+            published_before = next_before
 
     def live_ids(self, video_ids: Iterable[str]) -> dict[str, str]:
         """Map of currently-live video id -> category name (name may be "")."""

@@ -59,6 +59,10 @@ The app is two phases, decoupled by a catalogue snapshot:
 - yt-dlp is forced to an **HLS** format (`-f b[protocol*=m3u8]`) — some live streams
   default to DASH (`.mpd`) which the HLS proxy can't serve; `serve_stream` rejects
   any non-`#EXTM3U` body (so DASH-only cams are dropped, not served broken).
+- YouTube's `eventType=live` search is capped at ~100 results via `pageToken` (it
+  reports a huge `totalResults` but returns an empty page 3). `discover()` paginates
+  by `publishedBefore` time-windows instead (walking back from the last item's
+  `publishedAt`) to reach the deeper hundreds; `pageToken` silently caps you at ~100.
 
 **Security model:** every outbound fetch goes through `fetch.is_safe_url` (rejects
 non-http(s) and private/loopback/link-local IPs), an 8 MB cap, and **per-hop redirect
