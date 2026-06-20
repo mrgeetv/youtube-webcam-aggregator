@@ -1,151 +1,108 @@
-# YouTube Live Webcam Aggregator
+# Live Webcam Aggregator
 
-Turn YouTube into your personal webcam IPTV service.
+Turn live webcams from across the web into your own IPTV channel list.
 
-Automatically discovers live webcam streams on YouTube and generates an M3U8 playlist for IPTV applications. Creates a curated, categorized collection of webcam streams without manual searching through YouTube.
+It discovers live webcam streams from multiple sources, merges and de-duplicates
+them into a single categorised **M3U8 playlist**, and serves it over HTTP for any
+IPTV player (TiViMate, VLC, smart TVs, …). Streams are resolved **on demand** when
+you press play, so the playlist never goes stale and the box does almost no work
+until you actually watch something.
 
-**Features:**
+## Sources
 
-- Auto-updating M3U8 playlists
-- Organized by category (Animals, Transportation, Education, etc.)
-- Customizable search and filtering
-- Docker containerized for easy deployment
-- Compatible with any M3U-capable player (VLC, IPTV apps, smart TVs, etc.)
+| Source | What it adds |
+| ------ | ------------ |
+| YouTube Data API | Live webcam broadcasts found by search |
+| worldcams.tv | Scraped camera directory |
+| cxtvlive.com | Scraped camera directory |
 
-## Quick Start
+The same camera found on more than one source is merged into a single channel.
+
+## How it works
+
+- **Catalogue build** (periodic, slow): each source is crawled, dead streams are
+  dropped, survivors are de-duplicated, mapped to a unified category, and written
+  into a playlist of stable internal URLs.
+- **On-demand serving**: when a player opens a channel, the container resolves the
+  real stream there and then and proxies the HLS manifest — refreshing expiring
+  tokens transparently so long sessions don't die. Video segments stream **directly**
+  from the source CDN; only the tiny manifest passes through the container.
+
+## Quick start
 
 ### Prerequisites
 
-- [YouTube Data API v3 key](https://console.cloud.google.com/apis/credentials) (free with Google account)
-- Docker
+- A [YouTube Data API v3 key](https://console.cloud.google.com/apis/credentials)
+  (free with a Google account)
+- Docker + Docker Compose
 
-### Run with Docker
-
-```bash
-docker run -d \
-  --name youtube-webcams \
-  -p 8000:8000 \
-  -e YOUTUBE_API_KEY=your_api_key_here \
-  ghcr.io/mrgeetv/youtube-webcam-aggregator:latest
-```
-
-**With optional configuration:**
+### Run
 
 ```bash
-docker run -d \
-  --name youtube-webcams \
-  -p 8000:8000 \
-  -e YOUTUBE_API_KEY=your_api_key_here \
-  -e SEARCH_QUERY="webcam|live|nature -gaming" \
-  -e EXCLUDED_CATEGORIES="Gaming,Music" \
-  ghcr.io/mrgeetv/youtube-webcam-aggregator:latest
+git clone https://github.com/mrgeetv/youtube-webcam-aggregator.git
+cd youtube-webcam-aggregator
+cp .env.example .env          # then edit .env and set YOUTUBE_API_KEY
+docker compose up -d
 ```
 
-### Access Your Playlist
+The playlist is then available at `http://localhost:23457/playlist.m3u8`.
 
-**Playlist URL:** `http://<your-host>:8000/playlist.m3u8`
+## Adding it to TiViMate (or any IPTV player)
 
-- Use `localhost` for local installations
-- Use your server's IP or hostname for remote access
+It's a standard M3U8 playlist, so:
 
-Open this URL in any M3U-compatible player (VLC, IPTV apps, media players, etc.)
+1. Make sure the container is reachable at the address your player will use, and set
+   **`PUBLIC_BASE_URL`** to that address (see *Exposing it* below) — the playlist hands
+   out `/stream/<id>` URLs that must be reachable by the player.
+2. In **TiViMate**: *Settings → Playlists → Add playlist → Enter URL* → paste
+   `https://<your-address>/playlist.m3u8` → *Next*. Channels load, grouped by category.
+3. Press play on a channel — the stream is resolved on demand and starts.
+
+Notes:
+
+- First play of a YouTube camera takes a few seconds (it resolves cold, then it's
+  instant); other sources are near-instant.
+- There's no EPG — webcams have no schedule, so they appear as channels without a guide.
+- Designed and tested against HLS/ExoPlayer-based players (TiViMate, VLC). Try one
+  channel first to confirm your player + network path.
+
+## Exposing it
+
+The app is **exposure-agnostic** — it just serves HTTP and builds links from
+`PUBLIC_BASE_URL`. Put whatever you like in front (reverse proxy, Tailscale, plain
+LAN port). The only requirement: the front door must forward **both**
+`/playlist.m3u8` **and** `/stream/*` to the container, and `PUBLIC_BASE_URL` must be
+the address clients actually reach (e.g. `https://cams.example.com`).
+
+## Endpoints
+
+| Path | Purpose |
+| ---- | ------- |
+| `/playlist.m3u8` | The channel list |
+| `/stream/<id>` | On-demand resolve + HLS manifest proxy (302 for MP4 sources) |
+| `/health` | JSON status: readiness, stream count, per-source counts, memory |
 
 ## Configuration
 
-### Environment Variables
+All via environment variables (see `.env.example`):
 
-**Required:**
-
-- `YOUTUBE_API_KEY` - Your YouTube Data API v3 key
-
-**Optional:**
-
-- `SEARCH_QUERY` - Search terms for finding streams (default includes webcam, live, nature terms)
-- `EXCLUDED_CATEGORIES` - YouTube categories to exclude (comma-separated)
-- `UPDATE_INTERVAL_HOURS` - Playlist refresh frequency (default: 5, max recommended: 5)
-
-### Example Configurations
-
-**Nature & Wildlife Focus:**
-
-```bash
--e SEARCH_QUERY="animal|wildlife|bird|nature|zoo|aquarium|safari|live|cam -gameplay -gaming"
--e EXCLUDED_CATEGORIES="Gaming,Sports,Music,Entertainment"
-```
-
-**Transportation Focus:**
-
-```bash
--e SEARCH_QUERY="train|railway|airport|harbor|traffic|road|ferry|live|cam -gameplay -gaming"
--e EXCLUDED_CATEGORIES="Gaming,Sports,Music,Entertainment,Comedy"
-```
-
-### Available Categories for Exclusion
-
-- Film & Animation
-- Autos & Vehicles
-- Music
-- Pets & Animals
-- Sports
-- Travel & Events
-- Gaming
-- People & Blogs
-- Comedy
-- Entertainment
-- News & Politics
-- Howto & Style
-- Education
-- Science & Technology
-- Nonprofits & Activism
-
-## Important Notes
-
-### YouTube API Limitations
-
-- **Inconsistent results**: YouTube's API can return different streams on each run - this is normal behavior
-- **Rate limits**: Free tier includes 10,000 quota units per day (typically sufficient for normal use)
-- **Search variability**: Results depend on what's currently live on YouTube
-
-### Stream Expiration
-
-- **Refresh interval limit**: Don't set `UPDATE_INTERVAL_HOURS` above 5 - streams expire after ~6 hours
-- **Dead streams**: If you see connection errors, the playlist needs refreshing
-
-### Search Query Optimization
-
-- **Less is more**: Adding too many search terms can actually worsen results
-- **Use exclusions**: The `-gameplay -gaming` style exclusions help filter unwanted content
-- **Test iteratively**: Start simple and add terms gradually
-
-## Troubleshooting
-
-### No Streams Found
-
-- Verify your YouTube API key is correct and active
-- Check API quota usage in Google Console
-- Try a simpler search query with fewer terms
-- Ensure excluded categories aren't filtering everything out
-
-### Streams Won't Play
-
-- Check if playlist was recently updated (streams may have expired)
-- Verify the M3U8 URL is accessible: `curl http://<your-host>:8000/playlist.m3u8`
-- Restart the container: `docker restart youtube-webcams`
-
-### API Quota Exceeded
-
-- Monitor usage in [Google Console](https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas)
-- Increase update interval to reduce API calls
-- Consider requesting quota increase for heavy usage
-
-### Viewing Logs
-
-```bash
-docker logs -f youtube-webcams
-```
-
-Look for successful playlist generation messages and any API errors.
+| Variable | Default | Description |
+| -------- | ------- | ----------- |
+| `YOUTUBE_API_KEY` | (required) | YouTube Data API v3 key |
+| `PUBLIC_BASE_URL` | `http://localhost:8000` | Externally-reachable base for the emitted URLs |
+| `CATALOGUE_INTERVAL_HOURS` | `6` | Hours between catalogue refreshes (min 1) |
+| `SEARCH_QUERY` | built-in webcam query | YouTube search terms (`\|`=OR, space=AND, `-`=exclude) |
+| `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+| `PORT` | `8000` | HTTP port inside the container |
 
 ## Development
 
-For local development setup, Docker Compose usage, and contributing guidelines, see [DEVELOPMENT.md](DEVELOPMENT.md).
+See [DEVELOPMENT.md](DEVELOPMENT.md) for local setup, the test suite, and the
+project structure. Built test-first; run the checks with `pre-commit run --all-files`
+and `pytest`.
+
+## Security note
+
+The on-demand stream proxy validates and signs the URLs it will fetch and refuses to
+reach private/loopback addresses, but this is a self-hosted tool — put it behind your
+own reverse proxy / network controls rather than exposing the raw port to the internet.
