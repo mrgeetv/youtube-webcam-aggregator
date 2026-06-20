@@ -58,7 +58,13 @@ SegmentResponse = tuple[int, str, str | None, bytes]
 def render_playlist(entries: list[CatalogueEntry], *, base_url: str) -> str:
     lines = ["#EXTM3U"]
     for e in entries:
-        lines.append(f'#EXTINF:-1 group-title="{e.category}",{e.title}')
+        # tvg-id is the STABLE per-cam id (same value as the /stream/<id> URL). It
+        # gives players (TiViMate) a fixed key to keep favourites linked to the right
+        # stream across catalogue rebuilds, independent of count, order, or title.
+        lines.append(
+            f'#EXTINF:-1 tvg-id="{e.id}" tvg-name="{e.title}" '
+            f'group-title="{e.category}",{e.title}'
+        )
         lines.append(f"{base_url}/stream/{e.id}")
     return "\n".join(lines) + "\n"
 

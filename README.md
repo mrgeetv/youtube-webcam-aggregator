@@ -68,6 +68,8 @@ Notes:
 - First play of a YouTube camera takes a few seconds (it resolves cold, then it's
   instant); other sources are near-instant.
 - There's no EPG — webcams have no schedule, so they appear as channels without a guide.
+- Each channel carries a stable `tvg-id`, so favourites stay linked to the right cam
+  across catalogue refreshes — even as the total channel count changes.
 - Designed and tested against HLS/ExoPlayer-based players (TiViMate, VLC). Try one
   channel first to confirm your player + network path.
 

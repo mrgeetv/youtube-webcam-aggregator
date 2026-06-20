@@ -57,7 +57,18 @@ def _make_cache(resolved: Resolved | None) -> ResolveCache:
 def test_render_playlist_extinf_line() -> None:
     entries = [_entry()]
     out = render_playlist(entries, base_url=BASE)
-    assert '#EXTINF:-1 group-title="Beaches",Miami' in out
+    assert (
+        f'#EXTINF:-1 tvg-id="{ENTRY_ID}" tvg-name="Miami" group-title="Beaches",Miami'
+        in out
+    )
+
+
+def test_render_playlist_tvg_id_equals_stream_id() -> None:
+    """tvg-id must equal the /stream/<id> id so players keep favourites linked to the
+    right cam across rebuilds (the count/order changing must not re-link them)."""
+    out = render_playlist([_entry()], base_url=BASE)
+    assert f'tvg-id="{ENTRY_ID}"' in out
+    assert f"{BASE}/stream/{ENTRY_ID}" in out
 
 
 def test_render_playlist_stream_url() -> None:
