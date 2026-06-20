@@ -127,7 +127,6 @@ All via environment variables (see `.env.example`):
 | `SEARCH_QUERY` | built-in webcam query | YouTube search terms (`\|`=OR, space=AND, `-`=exclude) |
 | `EXCLUDE_CATEGORIES` | (none) | Comma-separated categories to drop, across all sources, case-insensitive. See *Filtering by category* |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
-| `PORT` | `8000` | HTTP port inside the container |
 | `SCRAPE_WORKERS` | `min(16, cpu×4)` | Concurrency for scraping + liveness during the catalogue build. Lower it to reduce peak build-time memory (at the cost of a slower build) |
 
 > **Resource usage:** memory peaks during the periodic catalogue build (it fetches

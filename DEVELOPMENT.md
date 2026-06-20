@@ -50,7 +50,6 @@ Configure these in your `.env` file or pass directly to docker-compose:
 | `SEARCH_QUERY` | built-in webcam query | YouTube search terms (`\|`=OR, space=AND, `-`=exclude) |
 | `EXCLUDE_CATEGORIES` | (none) | Comma-separated categories to drop across all sources (case-insensitive) |
 | `LOG_LEVEL` | `INFO` | Logging verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
-| `PORT` | `8000` | HTTP port inside the container |
 | `SCRAPE_WORKERS` | `min(16, cpu×4)` | Concurrency for scraping + liveness during the catalogue build |
 
 ### Using the Run Script
@@ -180,7 +179,7 @@ live-webcam-aggregator/
 
 ## Port Configuration
 
-- **Internal port:** 8000 (default; configurable via `PORT`)
+- **Internal port:** 8000 (fixed; remap on the host side via the compose port mapping)
 - **Docker Compose port:** 23457 (mapped from 8000)
 
 The HTTP server serves `/playlist.m3u8`, `/health`, and `/stream/<id>`
@@ -207,7 +206,7 @@ liveness-probe failures. Live process memory (`rss_mb`) and per-source counts ar
 exposed on the `/health` endpoint.
 
 Suspect config logs a `WARNING` at startup rather than failing silently: a non-numeric
-`CATALOGUE_INTERVAL_HOURS`/`PORT`/`SCRAPE_WORKERS`, an unknown `LOG_LEVEL`, a
+`CATALOGUE_INTERVAL_HOURS`/`SCRAPE_WORKERS`, an unknown `LOG_LEVEL`, a
 `localhost` `PUBLIC_BASE_URL` (unreachable by remote players), or an unknown name in
 `EXCLUDE_CATEGORIES`.
 

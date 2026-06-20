@@ -398,7 +398,7 @@ def main() -> None:
         source_counts=source_counts,
         segment_fetch=manifest_fetcher.get_segment,
     )
-    run_http_server(handler_cls, port=cfg.port)
+    run_http_server(handler_cls)
 
     while True:
         try:
