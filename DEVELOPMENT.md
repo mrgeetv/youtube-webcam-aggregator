@@ -147,11 +147,11 @@ youtube-webcam-aggregator/
 
 ## Port Configuration
 
-- **Internal port:** 8000 (hardcoded in Python application)
+- **Internal port:** 8000 (default; configurable via `PORT`)
 - **Docker Compose port:** 23457 (mapped from 8000)
 
-The HTTP server serves `/playlist.m3u8`, `/health`, and `/stream/<id>.m3u8`
-(per-stream manifest proxy) endpoints.
+The HTTP server serves `/playlist.m3u8`, `/health`, and `/stream/<id>`
+(on-demand resolve + HLS manifest proxy) endpoints.
 
 ## Debugging
 

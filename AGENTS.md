@@ -6,6 +6,57 @@
 
 @DEVELOPMENT.md
 
+## Architecture & Extension Points (v2)
+
+The app is two phases, decoupled by a catalogue snapshot:
+
+1. **Catalogue build** (`catalogue.py`, every `CATALOGUE_INTERVAL_HOURS`): each
+   `Source.discover()` yields `Candidate`s → liveness filter (YouTube via the Data
+   API batch; everything else via a resolve-probe) → per-source empty-guard (keeps
+   the last good set if a source collapses ≥50%, needs 2 bad cycles to accept) →
+   cross-source `dedupe()` (per-field merge) → `CatalogueEntry`s with a stable id.
+2. **On-demand serve** (`serving.py` + `app.py` handler): the playlist holds stable
+   `/stream/<id>` URLs. On play, `ResolveCache` resolves the upstream via the
+   `Registry`→`Extractor`, and the HLS manifest is proxied — child manifests are
+   rewritten back through `/stream/<id>/m?u=…&sig=…`; segments go direct to the CDN.
+
+**`build_app()` in `app.py` is the wiring seam.** To extend:
+
+- **Add a source** — implement the `Source` protocol (`sources/base.py`): a `name`
+  and `discover() -> Iterable[Candidate]`. HTML sources subclass the scraper base and
+  reuse the extraction ladder. Add the instance to `active_sources` in `build_app`.
+  Set `Candidate.predisc_key` so dedup can merge it (`yt:<id>` for YouTube,
+  `hls:<normalised>` for direct m3u8, `None` = never merged).
+- **Add an extractor** — implement the `Extractor` protocol (`extractors/base.py`):
+  `resolve(target_url) -> Resolved(url, stream_type, ttl_seconds)`. Add it to the
+  `extractors` dict in `build_app` AND a predicate to `build_registry`. Startup
+  validation raises if a rule names an extractor that isn't in the dict.
+- **Category mapping** lives in `categories.py` (`_MAP`); native YouTube categories
+  pass through, everything else maps to the unified taxonomy or "Uncategorised".
+
+**Hard-won lessons (don't relearn these):**
+
+- Route ipcamlive **`player/player.php` URLs only** to the resolver; direct
+  `s*.ipcamlive.com/.../stream.m3u8` (the majority) must fall through to `DirectHls`.
+- Baltic's admin-ajax POST needs `Referer` = the **site origin** (`origin_of`), not
+  the ajax URL — wrong Referer 403s silently.
+- YouTube extraction needs the deno/yt-dlp-ejs stack (the n-challenge); the Dockerfile
+  patches deno's ELF interpreter so it runs on the hardened Alpine runtime — leave it.
+- Liveness is a **build-time** probe (the playlist must not list dead cams); the
+  serve-time resolve is separate and fresh (tokens expire). Don't merge them.
+
+**Security model:** every outbound fetch goes through `fetch.is_safe_url` (rejects
+non-http(s) and private/loopback/link-local IPs) and an 8 MB cap; proxied `/m` URLs
+are HMAC-signed (`signing.py`) so only server-emitted URLs are fetched. **Known
+residual:** `is_safe_url` validates the original URL but the HTTP libs follow
+redirects and re-resolve DNS unchecked (redirect-following / DNS-rebinding SSRF) —
+the durable fix is connection-level IP pinning; until then, run it behind your own
+network controls.
+
+**Tests:** files are `*_test.py` (the `name-tests-test` hook rejects `test_*.py`);
+real-endpoint tests are marked `@pytest.mark.live` and excluded by default
+(`pytest.ini`). The gate is `pre-commit` + `pytest`, not ruff/mypy.
+
 ## Branching Workflow
 
 For any new work (fixes, features, chores, etc.):
