@@ -106,9 +106,9 @@ Hooks will run automatically on commit, checking:
 - Markdown formatting (markdownlint)
 - Conventional commit messages
 - Type checking (basedpyright)
-- **Tests + coverage (pytest)** — runs the full suite with a coverage floor when
+- **Tests + coverage (pytest)**: runs the full suite with a coverage floor when
   `src/`, `tests/`, or `requirements*.txt` change
-- **Dead-code detection (vulture)** — flags unused functions/attributes on `src/`
+- **Dead-code detection (vulture)**: flags unused functions/attributes on `src/`
 
 > **Note:** the `pytest` hook calls `pytest` directly, so your dev virtualenv must
 > be active (or otherwise on `PATH`) when committing. The same checks run in CI on
@@ -133,7 +133,7 @@ pytest                                                      # run the suite
 pytest --cov=webcam_aggregator --cov-report=term-missing    # with coverage
 ```
 
-The suite runs in **parallel** via `pytest-xdist` (`-n auto` — one worker per CPU, so
+The suite runs in **parallel** via `pytest-xdist` (`-n auto`, one worker per CPU, so
 it adapts to whatever box you're on); run `pytest -n 0` to go serial (e.g. for `pdb`).
 
 The same `pytest` + coverage floor runs as a pre-commit hook (when `src/`, `tests/`,
@@ -212,7 +212,7 @@ Suspect config logs a `WARNING` at startup rather than failing silently: a non-n
 `EXCLUDE_CATEGORIES`.
 
 Memory peaks **during** the catalogue build (it fetches + liveness-checks every
-source concurrently) and settles back down once the playlist is built — the build is
+source concurrently) and settles back down once the playlist is built. The build is
 the high-water mark, not a leak. Lower `SCRAPE_WORKERS` to reduce that peak.
 
 ### Viewing Debug Logs

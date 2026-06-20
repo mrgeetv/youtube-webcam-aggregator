@@ -23,7 +23,7 @@ The same camera found on more than one source is merged into a single channel.
 - **Catalogue build** (periodic): every `CATALOGUE_INTERVAL_HOURS`, each source is
   crawled, dead streams are dropped, survivors are de-duplicated, mapped to a unified
   category, and written into a playlist of stable internal URLs. This is the slow
-  part — roughly **6–7 minutes** for a ~2000-cam catalogue (scales with how big the
+  part (roughly **6–7 minutes** for a ~2000-cam catalogue; scales with how big the
   sources are and with `SCRAPE_WORKERS`).
 - **On-demand serving**: when a player opens a channel, the container resolves the
   stream on request and proxies the HLS manifest, refreshing expiring tokens
@@ -53,7 +53,7 @@ docker run -d --name webcams \
   ghcr.io/mrgeetv/youtube-webcam-aggregator:v2
 ```
 
-Or with a minimal `docker-compose.yml` (uses the published image — no build):
+Or with a minimal `docker-compose.yml` (uses the published image, no build):
 
 ```yaml
 services:
@@ -70,7 +70,7 @@ The playlist is then available at `http://localhost:23457/playlist.m3u8`. The fi
 catalogue build takes a few minutes (discovery + liveness checks); until it's ready,
 `/playlist.m3u8` returns `503`.
 
-Set `PUBLIC_BASE_URL` to the address your players actually reach — `localhost` only
+Set `PUBLIC_BASE_URL` to the address your players actually reach; `localhost` only
 works for a player on the same machine (see *Exposing it*). These use the `:v2` major
 tag, so you get v2.x updates but never an automatic jump to a future breaking major
 (`:latest` would); see *Upgrading from v1*. Want to build from source instead? See
@@ -78,23 +78,23 @@ tag, so you get v2.x updates but never an automatic jump to a future breaking ma
 
 ## Adding it to a player
 
-It's a standard M3U8/HLS playlist, so it works in anything that can open one — media
+It's a standard M3U8/HLS playlist, so it works in anything that can open one: media
 players (VLC, mpv), IPTV apps, smart-TV apps, and similar:
 
 1. Make sure the container is reachable at the address your player will use, and set
-   **`PUBLIC_BASE_URL`** to that address (see *Exposing it* below) — the playlist hands
+   **`PUBLIC_BASE_URL`** to that address (see *Exposing it* below), because the playlist hands
    out `/stream/<id>` URLs that must be reachable by the player.
 2. Point the player at `https://<your-address>/playlist.m3u8`. Channels load, grouped
    by category.
-3. Open a channel — the stream is resolved on demand and begins playing.
+3. Open a channel. The stream is resolved on demand and begins playing.
 
 Notes:
 
 - First play of a YouTube camera takes a few seconds (it resolves cold, then it's
   instant); other sources are near-instant.
-- There's no EPG — webcams have no schedule, so they appear as channels without a guide.
+- There's no EPG; webcams have no schedule, so they appear as channels without a guide.
 - Each channel carries a stable `tvg-id`, so favourites stay linked to the right cam
-  across catalogue refreshes — even as the total channel count changes.
+  across catalogue refreshes, even as the total channel count changes.
 - Tested with HLS/ExoPlayer-based players (e.g. TiViMate, VLC). Try one channel first
   to confirm your player + network path.
 
@@ -130,21 +130,21 @@ All via environment variables (see `.env.example`):
 | `PORT` | `8000` | HTTP port inside the container |
 | `SCRAPE_WORKERS` | `min(16, cpu×4)` | Concurrency for scraping + liveness during the catalogue build. Lower it to reduce peak build-time memory (at the cost of a slower build) |
 
-> **Resource usage:** memory peaks during the periodic catalogue build — it fetches
-> and liveness-checks every source concurrently, then settles back down once the
+> **Resource usage:** memory peaks during the periodic catalogue build (it fetches
+> and liveness-checks every source concurrently), then settles back down once the
 > playlist is built (e.g. a transient ~1 GB during the build vs ~270 MB at rest for a
 > ~2000-cam catalogue). The build is the high-water mark; lower `SCRAPE_WORKERS` to
 > cap that peak. Live memory is on `/health` (`rss_mb`).
 
 ## Tuning the search query
 
-`SEARCH_QUERY` shapes **only the YouTube source** — the scraped directories
+`SEARCH_QUERY` shapes **only the YouTube source**; the scraped directories
 (worldcams.tv, cxtvlive.com) are taken as-is. It's passed to YouTube search with a
 simple syntax:
 
-- `|` = OR — `beach|harbor|coast` matches any of them
-- space = AND — `live cam` requires both words
-- `-` = exclude — `-gaming -asmr` drops results that mention those terms
+- `|` = OR: `beach|harbor|coast` matches any of them
+- space = AND: `live cam` requires both words
+- `-` = exclude: `-gaming -asmr` drops results that mention those terms
 
 Examples:
 
@@ -158,9 +158,9 @@ SEARCH_QUERY=train|railway|airport|harbor|traffic|ferry|live|cam -gameplay -gami
 
 Tips:
 
-- **Less is more** — piling on terms tends to *narrow* results and make them worse,
+- **Less is more**: piling on terms tends to *narrow* results and make them worse,
   not wider. Start broad, then add a few exclusions.
-- **Exclusions do the heavy lifting** — `-gaming -asmr -reaction`-style terms are the
+- **Exclusions do the heavy lifting**: `-gaming -asmr -reaction`-style terms are the
   most effective way to filter out non-webcam noise.
 - Leave `SEARCH_QUERY` unset to use the built-in default (a broad webcam query with
   sensible exclusions already baked in).
@@ -168,7 +168,7 @@ Tips:
 ## Filtering by category
 
 `EXCLUDE_CATEGORIES` drops whole categories (comma-separated, case-insensitive).
-Unlike `SEARCH_QUERY` it applies to **every source** — it filters on the unified
+Unlike `SEARCH_QUERY` it applies to **every source**, filtering on the unified
 category each cam is mapped to. For example, `EXCLUDE_CATEGORIES=Religion,Sports` drops
 every religion and sports cam regardless of which source it came from.
 
@@ -187,7 +187,7 @@ Travel & Events, Water & Waterways
 ## Upgrading from v1
 
 v2 is a ground-up rewrite and a **breaking change**. Images are tagged `:latest`,
-`:v<version>`, and `:v<major>` — so a pinned `:v1` keeps getting v1.x untouched, but
+`:v<version>`, and `:v<major>`. A pinned `:v1` keeps getting v1.x untouched, but
 if you track `:latest` you'll move to v2. To migrate your existing config:
 
 - **Set `PUBLIC_BASE_URL`** to the address your player actually reaches (see
@@ -195,7 +195,7 @@ if you track `:latest` you'll move to v2. To migrate your existing config:
   leaving it unset points the playlist at `localhost` and nothing plays.
 - **Renamed:** `UPDATE_INTERVAL_HOURS` → `CATALOGUE_INTERVAL_HOURS`; and
   `EXCLUDED_CATEGORIES` → `EXCLUDE_CATEGORIES` (note: no `D`). The v2 version filters
-  **all** sources on the unified taxonomy, not YouTube's category names — so update the
+  **all** sources on the unified taxonomy, not YouTube's category names, so update the
   values to the v2 category names (see *Filtering by category*); old names like
   `Gaming` no longer exist (use `SEARCH_QUERY` exclusions like `-gaming` instead).
 - **Removed (silently ignored if still set):** `MAX_VIDEOS_PER_CYCLE`,
@@ -216,5 +216,5 @@ and `pytest`.
 ## Security note
 
 The on-demand stream proxy validates and signs the URLs it will fetch and refuses to
-reach private/loopback addresses, but this is a self-hosted tool — put it behind your
+reach private/loopback addresses, but this is a self-hosted tool, so put it behind your
 own reverse proxy / network controls rather than exposing the raw port to the internet.
