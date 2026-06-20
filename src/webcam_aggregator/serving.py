@@ -36,6 +36,18 @@ def _proxy_segments_for(url: str) -> bool:
     return any(host == h or host.endswith("." + h) for h in _PROXY_SEGMENT_HOSTS)
 
 
+def _registrable_domain(host: str) -> str:
+    parts = host.lower().split(".")
+    return ".".join(parts[-2:]) if len(parts) >= 2 else host.lower()
+
+
+def _same_site(a: str, b: str) -> bool:
+    """True if two hosts share a registrable domain (last two labels). Heuristic —
+    treats 2-part TLDs (e.g. co.uk) as the registrable domain, acceptable here as it
+    only ever widens 'is this the upstream's own CDN' very slightly."""
+    return bool(a) and bool(b) and _registrable_domain(a) == _registrable_domain(b)
+
+
 # (status_code, content_type_or_location, body)
 Response = tuple[int, str, bytes]
 
@@ -59,9 +71,16 @@ def rewrite_manifest(
     base_url: str,
     proxy_segments: bool = False,
 ) -> str:
+    up_host = urlsplit(upstream_url).hostname or ""
+
     def repl(m: re.Match[str]) -> str:
         ref = m.group(1)
         absolute = urljoin(upstream_url, ref)
+        # Open-proxy guard: an upstream manifest is attacker-influenceable, so only
+        # sign/relay refs on the upstream's OWN site. An off-site ref is passed
+        # through as-is (the player fetches it direct) — never proxied through us.
+        if not _same_site(urlsplit(absolute).hostname or "", up_host):
+            return absolute
         if absolute.split("?", 1)[0].endswith(".m3u8"):
             return f"{base_url}/stream/{entry_id}/m?u={quote(absolute, safe='')}&sig={sign(absolute)}"
         if proxy_segments:

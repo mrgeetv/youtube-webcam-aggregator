@@ -514,3 +514,19 @@ def test_serve_segment_fetch_failure_returns_502() -> None:
     assert status == 502
     assert b"segment fetch failed" in body
     assert cr is None
+
+
+def test_rewrite_manifest_offsite_ref_passed_through_not_proxied() -> None:
+    """Open-proxy guard: a child ref on a DIFFERENT site than the upstream must be
+    passed through as-is, never signed/proxied through us. Same-site refs still are."""
+    text = (
+        "#EXTM3U\n"
+        "https://evil.example/inject.m3u8\n"  # off-site → must NOT be proxied
+        "child.m3u8\n"  # same-site relative to YT_UPSTREAM → proxied
+    )
+    out = rewrite_manifest(
+        text, upstream_url=YT_UPSTREAM, entry_id=ENTRY_ID, base_url=BASE
+    )
+    assert "https://evil.example/inject.m3u8" in out  # passed through verbatim
+    assert quote("https://evil.example/inject.m3u8", safe="") not in out  # not signed
+    assert f"{BASE}/stream/{ENTRY_ID}/m?u=" in out  # same-site child IS proxied
