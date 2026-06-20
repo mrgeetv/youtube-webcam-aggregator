@@ -39,7 +39,9 @@ jobs:
           python-version-file: ".python-version"
           # Cache pip dependencies (pre-commit package itself)
           cache: "pip"
-          cache-dependency-path: "requirements-dev.txt"
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
 
       - name: Cache pre-commit hooks
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -50,10 +52,10 @@ jobs:
           restore-keys: |
             pre-commit-${{ steps.setup-python.outputs.python-version }}-
 
-      - name: Install pre-commit
+      - name: Install dependencies (app + dev, so the pytest hook can import)
         run: |
           pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Run pre-commit hooks
         run: pre-commit run --all-files --show-diff-on-failure

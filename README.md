@@ -1,151 +1,220 @@
-# YouTube Live Webcam Aggregator
+# Live Webcam Aggregator
 
-Turn YouTube into your personal webcam IPTV service.
+Turn live webcams from across the web into a single, categorised **M3U8 playlist**
+you can open in any M3U8/HLS-capable player.
 
-Automatically discovers live webcam streams on YouTube and generates an M3U8 playlist for IPTV applications. Creates a curated, categorized collection of webcam streams without manual searching through YouTube.
+It discovers live webcam streams from multiple sources, merges and de-duplicates them
+into one playlist, and serves it over HTTP. Streams are resolved **on demand** when a
+channel is opened, so the playlist stays current and the server only does work when a
+stream is actually played.
 
-**Features:**
+## Sources
 
-- Auto-updating M3U8 playlists
-- Organized by category (Animals, Transportation, Education, etc.)
-- Customizable search and filtering
-- Docker containerized for easy deployment
-- Compatible with any M3U-capable player (VLC, IPTV apps, smart TVs, etc.)
+| Source | What it adds |
+| ------ | ------------ |
+| YouTube Data API | Live webcam broadcasts found by search |
+| worldcams.tv | Scraped camera directory |
+| cxtvlive.com | Scraped camera directory |
 
-## Quick Start
+The same camera found on more than one source is merged into a single channel.
+
+## How it works
+
+- **Catalogue build** (periodic): every `CATALOGUE_INTERVAL_HOURS`, each source is
+  crawled, dead streams are dropped, survivors are de-duplicated, mapped to a unified
+  category, and written into a playlist of stable internal URLs. This is the slow
+  part (roughly **6–7 minutes** for a ~2000-cam catalogue; scales with how big the
+  sources are and with `SCRAPE_WORKERS`).
+- **On-demand serving**: when a player opens a channel, the container resolves the
+  stream on request and proxies the HLS manifest, refreshing expiring tokens
+  transparently so long sessions keep playing. For most cams the video segments
+  stream **directly** from the source CDN (only the small manifest passes through the
+  box); a few sources whose streams are tied to the fetcher are handled specially
+  (passthrough or relayed) so they still play.
+
+## Quick start
 
 ### Prerequisites
 
-- [YouTube Data API v3 key](https://console.cloud.google.com/apis/credentials) (free with Google account)
-- Docker
+- A YouTube Data API v3 key (free with a Google account). In the
+  [Google Cloud Console](https://console.cloud.google.com/apis/credentials): create
+  a project, enable *YouTube Data API v3*, then create an API key.
+- Docker.
 
-### Run with Docker
+### Run
 
-```bash
-docker run -d \
-  --name youtube-webcams \
-  -p 8000:8000 \
-  -e YOUTUBE_API_KEY=your_api_key_here \
-  ghcr.io/mrgeetv/youtube-webcam-aggregator:latest
-```
-
-**With optional configuration:**
+Pull and run the published image:
 
 ```bash
-docker run -d \
-  --name youtube-webcams \
-  -p 8000:8000 \
-  -e YOUTUBE_API_KEY=your_api_key_here \
-  -e SEARCH_QUERY="webcam|live|nature -gaming" \
-  -e EXCLUDED_CATEGORIES="Gaming,Music" \
-  ghcr.io/mrgeetv/youtube-webcam-aggregator:latest
+docker run -d --name webcams \
+  -p 23457:8000 \
+  -e YOUTUBE_API_KEY=your_key_here \
+  -e PUBLIC_BASE_URL=http://localhost:23457 \
+  ghcr.io/mrgeetv/youtube-webcam-aggregator:v2
 ```
 
-### Access Your Playlist
+Or with a minimal `docker-compose.yml` (uses the published image, no build):
 
-**Playlist URL:** `http://<your-host>:8000/playlist.m3u8`
+```yaml
+services:
+  webcams:
+    image: ghcr.io/mrgeetv/youtube-webcam-aggregator:v2
+    ports: ["23457:8000"]
+    environment:
+      YOUTUBE_API_KEY: your_key_here
+      PUBLIC_BASE_URL: http://localhost:23457
+    restart: unless-stopped
+```
 
-- Use `localhost` for local installations
-- Use your server's IP or hostname for remote access
+The playlist is then available at `http://localhost:23457/playlist.m3u8`. The first
+catalogue build takes a few minutes (discovery + liveness checks); until it's ready,
+`/playlist.m3u8` returns `503`.
 
-Open this URL in any M3U-compatible player (VLC, IPTV apps, media players, etc.)
+Set `PUBLIC_BASE_URL` to the address your players actually reach; `localhost` only
+works for a player on the same machine (see *Exposing it*). These use the `:v2` major
+tag, so you get v2.x updates but never an automatic jump to a future breaking major
+(`:latest` would); see *Upgrading from v1*. Want to build from source instead? See
+[DEVELOPMENT.md](DEVELOPMENT.md).
+
+## Adding it to a player
+
+It's a standard M3U8/HLS playlist, so it works in anything that can open one: media
+players (VLC, mpv), IPTV apps, smart-TV apps, and similar:
+
+1. Make sure the container is reachable at the address your player will use, and set
+   **`PUBLIC_BASE_URL`** to that address (see *Exposing it* below), because the playlist hands
+   out `/stream/<id>` URLs that must be reachable by the player.
+2. Point the player at `https://<your-address>/playlist.m3u8`. Channels load, grouped
+   by category.
+3. Open a channel. The stream is resolved on demand and begins playing.
+
+Notes:
+
+- First play of a YouTube camera takes a few seconds (it resolves cold, then it's
+  instant); other sources are near-instant.
+- There's no EPG; webcams have no schedule, so they appear as channels without a guide.
+- Each channel carries a stable `tvg-id`, so favourites stay linked to the right cam
+  across catalogue refreshes, even as the total channel count changes.
+- Tested with HLS/ExoPlayer-based players (e.g. TiViMate, VLC). Try one channel first
+  to confirm your player + network path.
+
+## Exposing it
+
+The application is **exposure-agnostic**: it serves HTTP and builds links from
+`PUBLIC_BASE_URL`. Any reverse proxy, tunnel (such as Tailscale), or direct port
+mapping can sit in front. The only requirement is that the front door forwards
+**both** `/playlist.m3u8` **and** `/stream/*` to the container, and that
+`PUBLIC_BASE_URL` is set to the address clients actually reach
+(for example `https://cams.example.com`).
+
+## Endpoints
+
+| Path | Purpose |
+| ---- | ------- |
+| `/playlist.m3u8` | The channel list |
+| `/stream/<id>` | On-demand resolve + HLS manifest proxy (302 for MP4 sources) |
+| `/health` | JSON status: readiness, stream count, per-source counts, memory |
 
 ## Configuration
 
-### Environment Variables
+All via environment variables (see `.env.example`):
 
-**Required:**
+| Variable | Default | Description |
+| -------- | ------- | ----------- |
+| `YOUTUBE_API_KEY` | (required) | YouTube Data API v3 key |
+| `PUBLIC_BASE_URL` | `http://localhost:8000` | Externally-reachable base for the emitted URLs |
+| `CATALOGUE_INTERVAL_HOURS` | `6` | Hours between catalogue refreshes (min 1) |
+| `SEARCH_QUERY` | built-in webcam query | YouTube search terms (`\|`=OR, space=AND, `-`=exclude) |
+| `EXCLUDE_CATEGORIES` | (none) | Comma-separated categories to drop, across all sources, case-insensitive. See *Filtering by category* |
+| `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+| `PORT` | `8000` | HTTP port inside the container |
+| `SCRAPE_WORKERS` | `min(16, cpu×4)` | Concurrency for scraping + liveness during the catalogue build. Lower it to reduce peak build-time memory (at the cost of a slower build) |
 
-- `YOUTUBE_API_KEY` - Your YouTube Data API v3 key
+> **Resource usage:** memory peaks during the periodic catalogue build (it fetches
+> and liveness-checks every source concurrently), then settles back down once the
+> playlist is built (e.g. a transient ~1 GB during the build vs ~270 MB at rest for a
+> ~2000-cam catalogue). The build is the high-water mark; lower `SCRAPE_WORKERS` to
+> cap that peak. Live memory is on `/health` (`rss_mb`).
 
-**Optional:**
+## Tuning the search query
 
-- `SEARCH_QUERY` - Search terms for finding streams (default includes webcam, live, nature terms)
-- `EXCLUDED_CATEGORIES` - YouTube categories to exclude (comma-separated)
-- `UPDATE_INTERVAL_HOURS` - Playlist refresh frequency (default: 5, max recommended: 5)
+`SEARCH_QUERY` shapes **only the YouTube source**; the scraped directories
+(worldcams.tv, cxtvlive.com) are taken as-is. It's passed to YouTube search with a
+simple syntax:
 
-### Example Configurations
+- `|` = OR: `beach|harbor|coast` matches any of them
+- space = AND: `live cam` requires both words
+- `-` = exclude: `-gaming -asmr` drops results that mention those terms
 
-**Nature & Wildlife Focus:**
+Examples:
 
-```bash
--e SEARCH_QUERY="animal|wildlife|bird|nature|zoo|aquarium|safari|live|cam -gameplay -gaming"
--e EXCLUDED_CATEGORIES="Gaming,Sports,Music,Entertainment"
+```text
+# Nature & wildlife
+SEARCH_QUERY=animal|wildlife|bird|nature|zoo|aquarium|safari|live|cam -gameplay -gaming
+
+# Transport
+SEARCH_QUERY=train|railway|airport|harbor|traffic|ferry|live|cam -gameplay -gaming
 ```
 
-**Transportation Focus:**
+Tips:
 
-```bash
--e SEARCH_QUERY="train|railway|airport|harbor|traffic|road|ferry|live|cam -gameplay -gaming"
--e EXCLUDED_CATEGORIES="Gaming,Sports,Music,Entertainment,Comedy"
+- **Less is more**: piling on terms tends to *narrow* results and make them worse,
+  not wider. Start broad, then add a few exclusions.
+- **Exclusions do the heavy lifting**: `-gaming -asmr -reaction`-style terms are the
+  most effective way to filter out non-webcam noise.
+- Leave `SEARCH_QUERY` unset to use the built-in default (a broad webcam query with
+  sensible exclusions already baked in).
+
+## Filtering by category
+
+`EXCLUDE_CATEGORIES` drops whole categories (comma-separated, case-insensitive).
+Unlike `SEARCH_QUERY` it applies to **every source**, filtering on the unified
+category each cam is mapped to. For example, `EXCLUDE_CATEGORIES=Religion,Sports` drops
+every religion and sports cam regardless of which source it came from.
+
+The available categories are:
+
+```text
+Airports, Animals, Aquariums, Bars & Nightlife, Beaches, Cities, Education,
+Entertainment, Hotels, Landmarks, Mountains, Music, Nature & Parks, News & Politics,
+Nonprofits & Activism, Other, People & Blogs, Ports & Ships, Religion,
+Science & Technology, Seasonal, Space, Sports, Studios, Traffic, Trains & Railways,
+Travel & Events, Water & Waterways
 ```
 
-### Available Categories for Exclusion
+`Other` catches anything that didn't map to a known category.
 
-- Film & Animation
-- Autos & Vehicles
-- Music
-- Pets & Animals
-- Sports
-- Travel & Events
-- Gaming
-- People & Blogs
-- Comedy
-- Entertainment
-- News & Politics
-- Howto & Style
-- Education
-- Science & Technology
-- Nonprofits & Activism
+## Upgrading from v1
 
-## Important Notes
+v2 is a ground-up rewrite and a **breaking change**. Images are tagged `:latest`,
+`:v<version>`, and `:v<major>`. A pinned `:v1` keeps getting v1.x untouched, but
+if you track `:latest` you'll move to v2. To migrate your existing config:
 
-### YouTube API Limitations
+- **Set `PUBLIC_BASE_URL`** to the address your player actually reaches (see
+  *Exposing it*). v1 didn't need it; v2 builds the `/stream/<id>` URLs from it, so
+  leaving it unset points the playlist at `localhost` and nothing plays.
+- **Renamed:** `UPDATE_INTERVAL_HOURS` → `CATALOGUE_INTERVAL_HOURS`; and
+  `EXCLUDED_CATEGORIES` → `EXCLUDE_CATEGORIES` (note: no `D`). The v2 version filters
+  **all** sources on the unified taxonomy, not YouTube's category names, so update the
+  values to the v2 category names (see *Filtering by category*); old names like
+  `Gaming` no longer exist (use `SEARCH_QUERY` exclusions like `-gaming` instead).
+- **Removed (silently ignored if still set):** `MAX_VIDEOS_PER_CYCLE`,
+  `CONCURRENT_EXTRACTIONS`.
+- **Unchanged:** `YOUTUBE_API_KEY`, `SEARCH_QUERY`, `LOG_LEVEL`, and the `23457:8000`
+  port mapping.
 
-- **Inconsistent results**: YouTube's API can return different streams on each run - this is normal behavior
-- **Rate limits**: Free tier includes 10,000 quota units per day (typically sufficient for normal use)
-- **Search variability**: Results depend on what's currently live on YouTube
-
-### Stream Expiration
-
-- **Refresh interval limit**: Don't set `UPDATE_INTERVAL_HOURS` above 5 - streams expire after ~6 hours
-- **Dead streams**: If you see connection errors, the playlist needs refreshing
-
-### Search Query Optimization
-
-- **Less is more**: Adding too many search terms can actually worsen results
-- **Use exclusions**: The `-gameplay -gaming` style exclusions help filter unwanted content
-- **Test iteratively**: Start simple and add terms gradually
-
-## Troubleshooting
-
-### No Streams Found
-
-- Verify your YouTube API key is correct and active
-- Check API quota usage in Google Console
-- Try a simpler search query with fewer terms
-- Ensure excluded categories aren't filtering everything out
-
-### Streams Won't Play
-
-- Check if playlist was recently updated (streams may have expired)
-- Verify the M3U8 URL is accessible: `curl http://<your-host>:8000/playlist.m3u8`
-- Restart the container: `docker restart youtube-webcams`
-
-### API Quota Exceeded
-
-- Monitor usage in [Google Console](https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas)
-- Increase update interval to reduce API calls
-- Consider requesting quota increase for heavy usage
-
-### Viewing Logs
-
-```bash
-docker logs -f youtube-webcams
-```
-
-Look for successful playlist generation messages and any API errors.
+The catalogue is now multi-source (YouTube + worldcams.tv + cxtvlive.com) and streams
+resolve on demand, so expect a different, larger channel list. To stay on v1, pin the
+image to a `:v1` tag instead of `:latest`.
 
 ## Development
 
-For local development setup, Docker Compose usage, and contributing guidelines, see [DEVELOPMENT.md](DEVELOPMENT.md).
+See [DEVELOPMENT.md](DEVELOPMENT.md) for local setup, the test suite, and the
+project structure. Built test-first; run the checks with `pre-commit run --all-files`
+and `pytest`.
+
+## Security note
+
+The on-demand stream proxy validates and signs the URLs it will fetch and refuses to
+reach private/loopback addresses, but this is a self-hosted tool, so put it behind your
+own reverse proxy / network controls rather than exposing the raw port to the internet.
