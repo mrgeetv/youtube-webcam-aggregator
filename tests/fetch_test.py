@@ -213,3 +213,156 @@ def test_get_segment_refuses_redirect(monkeypatch: pytest.MonkeyPatch) -> None:
 
     f = Fetcher(delay=0.0, retries=1)
     assert f.get_segment("https://cdn.balticlivecam.com/seg.ts") is None
+
+
+# ---------------------------------------------------------------------------
+# Fetcher.get — RequestException paths
+# ---------------------------------------------------------------------------
+
+
+def test_get_returns_none_after_request_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """All retry attempts raise RequestException → Fetcher.get returns None."""
+    import requests
+
+    monkeypatch.setattr(
+        "webcam_aggregator.fetch.socket.getaddrinfo",
+        lambda *_a, **_k: _mock_getaddrinfo("93.184.216.34"),
+    )
+    monkeypatch.setattr(
+        "requests.Session.get",
+        lambda _self, _url, **_k: (_ for _ in ()).throw(
+            requests.RequestException("connection failed")
+        ),
+    )
+    f = Fetcher(delay=0.0, retries=1)
+    assert f.get("https://cdn.example/playlist.m3u8") is None
+
+
+def test_get_retries_on_request_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """First attempt raises RequestException, second succeeds → returns content."""
+    import requests
+
+    monkeypatch.setattr(
+        "webcam_aggregator.fetch.socket.getaddrinfo",
+        lambda *_a, **_k: _mock_getaddrinfo("93.184.216.34"),
+    )
+    call_count = [0]
+
+    class _GoodResp:
+        is_redirect: bool = False
+        is_permanent_redirect: bool = False
+
+        def raise_for_status(self) -> None: ...
+
+        def iter_content(self, _n: int) -> object:
+            return iter([b"hello"])
+
+        def close(self) -> None: ...
+
+    def fake_get(_self: object, _url: str, **_k: object) -> _GoodResp:
+        call_count[0] += 1
+        if call_count[0] == 1:
+            raise requests.RequestException("transient failure")
+        return _GoodResp()
+
+    monkeypatch.setattr("requests.Session.get", fake_get)
+    f = Fetcher(delay=0.0, retries=2)
+    result = f.get("https://cdn.example/playlist.m3u8")
+    assert result == "hello"
+    assert call_count[0] == 2
+
+
+def test_get_redirect_no_location_returns_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Redirect response with no Location header → returns None."""
+    monkeypatch.setattr(
+        "webcam_aggregator.fetch.socket.getaddrinfo",
+        lambda *_a, **_k: _mock_getaddrinfo("93.184.216.34"),
+    )
+
+    class _NoLocResp:
+        is_redirect: bool = True
+        is_permanent_redirect: bool = False
+        headers: dict[str, str] = {}  # no Location
+
+        def close(self) -> None: ...
+
+    monkeypatch.setattr("requests.Session.get", lambda _self, _url, **_k: _NoLocResp())
+    f = Fetcher(delay=0.0, retries=1)
+    assert f.get("https://cdn.example/playlist.m3u8") is None
+
+
+def test_get_segment_request_exception_returns_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """RequestException in get_segment → None."""
+    import requests
+
+    monkeypatch.setattr(
+        "webcam_aggregator.fetch.socket.getaddrinfo",
+        lambda *_a, **_k: _mock_getaddrinfo("93.184.216.34"),
+    )
+    monkeypatch.setattr(
+        "requests.Session.get",
+        lambda _self, _url, **_k: (_ for _ in ()).throw(
+            requests.RequestException("timeout")
+        ),
+    )
+    f = Fetcher(delay=0.0, retries=1)
+    assert f.get_segment("https://cdn.example/seg.ts") is None
+
+
+def test_get_oversized_body_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Body exceeding MAX_BYTES ceiling → _fetch_following returns None."""
+    from webcam_aggregator.fetch import MAX_BYTES
+
+    monkeypatch.setattr(
+        "webcam_aggregator.fetch.socket.getaddrinfo",
+        lambda *_a, **_k: _mock_getaddrinfo("93.184.216.34"),
+    )
+
+    class _BigResp:
+        is_redirect: bool = False
+        is_permanent_redirect: bool = False
+
+        def raise_for_status(self) -> None: ...
+
+        def iter_content(self, _n: int) -> object:
+            # Return one chunk larger than MAX_BYTES
+            return iter([b"x" * (MAX_BYTES + 1)])
+
+        def close(self) -> None: ...
+
+    monkeypatch.setattr("requests.Session.get", lambda _self, _url, **_k: _BigResp())
+    f = Fetcher(delay=0.0, retries=1)
+    assert f.get("https://cdn.example/big.m3u8") is None
+
+
+def test_get_segment_oversized_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Segment exceeding SEGMENT_MAX_BYTES ceiling → get_segment returns None."""
+    from webcam_aggregator.fetch import SEGMENT_MAX_BYTES
+
+    monkeypatch.setattr(
+        "webcam_aggregator.fetch.socket.getaddrinfo",
+        lambda *_a, **_k: _mock_getaddrinfo("93.184.216.34"),
+    )
+
+    class _BigSegResp:
+        is_redirect: bool = False
+        is_permanent_redirect: bool = False
+        status_code: int = 200
+        headers: dict[str, str] = {"Content-Type": "video/mp2t"}
+
+        def iter_content(self, _n: int) -> object:
+            return iter([b"x" * (SEGMENT_MAX_BYTES + 1)])
+
+        def close(self) -> None: ...
+
+    monkeypatch.setattr("requests.Session.get", lambda _self, _url, **_k: _BigSegResp())
+    f = Fetcher(delay=0.0, retries=1)
+    assert f.get_segment("https://cdn.example/seg.ts") is None

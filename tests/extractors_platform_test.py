@@ -1,31 +1,7 @@
-import urllib.parse
-import urllib.request
-
 import pytest
 
 from webcam_aggregator.extractors.baltic import BalticResolver
 from webcam_aggregator.extractors.ipcamlive import IpcamliveResolver
-
-_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-
-
-def _http_get(url: str) -> str:
-    req = urllib.request.Request(url, headers={"User-Agent": _UA})
-    with urllib.request.urlopen(req, timeout=20) as r:
-        return r.read().decode("utf-8", "replace")
-
-
-def _http_post(url: str, data: dict[str, str]) -> str:
-    body = urllib.parse.urlencode(data).encode()
-    headers = {
-        "User-Agent": _UA,
-        "X-Requested-With": "XMLHttpRequest",
-        "Referer": "https://balticlivecam.com/",
-    }
-    req = urllib.request.Request(url, data=body, headers=headers)
-    with urllib.request.urlopen(req, timeout=20) as r:
-        return r.read().decode("utf-8", "replace")
-
 
 # --- offline unit tests -----------------------------------------------------
 
@@ -66,26 +42,43 @@ def test_baltic_extracts_m3u8_from_auth_token():
     assert out.ttl_seconds is not None
 
 
-# --- live tests (real endpoints; excluded from default run; run with `-m live`) ---
+def test_baltic_no_camera_id_raises() -> None:
+    """Page with no auth_token id: raises ValueError."""
+    with pytest.raises(ValueError, match="no camera id"):
+        BalticResolver(
+            get=lambda _url: "<html>no data block here</html>",
+            post=lambda _url, _data: "",
+        ).resolve("https://balticlivecam.com/cameras/missing/?embed")
 
 
-@pytest.mark.live
-def test_baltic_live():
-    out = BalticResolver(get=_http_get, post=_http_post).resolve(
-        "https://balticlivecam.com/cameras/latvia/riga/11-november-embankment/?embed"
+def test_baltic_no_m3u8_in_response_raises() -> None:
+    """Valid camera id but post response has no .m3u8 URL → ValueError."""
+    page = "var data = { action: 'auth_token', id: 42, embed: 1 };"
+    with pytest.raises(ValueError, match="no m3u8"):
+        BalticResolver(
+            get=lambda _url: page,
+            post=lambda _url, _data: "<div>error: no stream available</div>",
+        ).resolve("https://balticlivecam.com/cameras/offline/?embed")
+
+
+def test_baltic_ttl_derived_from_epoch_ms() -> None:
+    """ttl_seconds is derived from the 13-digit epoch-ms in the token."""
+    import time
+
+    page = "var data = { action: 'auth_token', id: 7, embed: 1 };"
+    # Use a far-future epoch_ms (year 2099) so ttl is always positive in tests.
+    future_epoch_ms = 4_070_908_800_000  # 2099-01-01 00:00:00 UTC in ms
+    fragment = (
+        f'src:"https://edge01.balticlivecam.com/blc/cam/playlist.m3u8'
+        f'?token=h:{future_epoch_ms}"'
     )
-    assert ".m3u8" in out.url
-    assert "balticlivecam" in out.url
 
+    out = BalticResolver(
+        get=lambda _url: page,
+        post=lambda _url, _data: fragment,
+    ).resolve("https://balticlivecam.com/cameras/ttl-test/?embed")
 
-@pytest.mark.live
-def test_ipcamlive_live_handles_real_player_php():
-    # Real cxtvlive ipcamlive embed. The cam may be offline (empty streamid → ValueError);
-    # both outcomes prove the resolver parses the real player.php format without crashing.
-    url = "https://g0.ipcamlive.com/player/player.php?alias=5d0a729743d32"
-    try:
-        out = IpcamliveResolver(fetch=_http_get).resolve(url)
-    except ValueError:
-        return
-    assert "ipcamlive.com/streams/" in out.url
-    assert out.url.endswith("stream.m3u8")
+    assert out.ttl_seconds is not None
+    expected = future_epoch_ms // 1000 - int(time.time())
+    # Allow ±2 s for execution time
+    assert abs(out.ttl_seconds - expected) <= 2

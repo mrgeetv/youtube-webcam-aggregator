@@ -65,8 +65,8 @@ def _manifest_fetch(_url: str) -> str | None:
     return _SMALL_MANIFEST
 
 
-def _youtube_live(ids: Iterable[str]) -> set[str]:
-    return set(ids)
+def _youtube_live(ids: Iterable[str]) -> dict[str, str]:
+    return {i: i for i in ids}
 
 
 # ---------------------------------------------------------------------------

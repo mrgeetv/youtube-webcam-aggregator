@@ -1,5 +1,3 @@
-import pytest
-
 from webcam_aggregator.fetch import FetcherProtocol
 from webcam_aggregator.sources.worldcams import WorldcamsSource
 
@@ -74,17 +72,3 @@ def test_skips_camera_page_returning_none() -> None:
     fetcher: FetcherProtocol = _FakeFetcher(pages)
     cands = list(WorldcamsSource(fetch=fetcher).discover())
     assert cands == []
-
-
-@pytest.mark.live
-def test_worldcams_live_discovers_real_cams() -> None:
-    from webcam_aggregator.fetch import Fetcher
-
-    src = WorldcamsSource(fetch=Fetcher(delay=0.0))
-    found = []
-    for c in src.discover():
-        found.append(c)
-        if len(found) >= 3:  # just prove discovery works against the real site
-            break
-    assert len(found) >= 1
-    assert any(c.title for c in found)

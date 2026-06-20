@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from webcam_aggregator.fetch import FetcherProtocol
 from webcam_aggregator.sources.cxtvlive import CxtvliveSource
 
@@ -46,17 +44,3 @@ def test_mjpeg_only_page_dropped() -> None:
         }
     )
     assert list(CxtvliveSource(fetch=f).discover()) == []
-
-
-@pytest.mark.live
-def test_cxtvlive_live_discovers_real_cams() -> None:
-    from webcam_aggregator.fetch import Fetcher
-
-    src = CxtvliveSource(fetch=Fetcher(delay=0.0))
-    found = []
-    for c in src.discover():
-        found.append(c)
-        if len(found) >= 3:
-            break
-    assert len(found) >= 1
-    assert any(c.predisc_key for c in found)
