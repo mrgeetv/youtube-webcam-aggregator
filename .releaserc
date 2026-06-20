@@ -9,6 +9,14 @@
         "preset": "conventionalcommits",
         "releaseRules": [
           {
+            "breaking": true,
+            "release": "major"
+          },
+          {
+            "revert": true,
+            "release": "patch"
+          },
+          {
             "type": "feat",
             "release": "minor"
           },
