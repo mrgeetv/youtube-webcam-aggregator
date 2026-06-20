@@ -171,9 +171,13 @@ if you track `:latest` you'll move to v2. To migrate your existing config:
 - **Set `PUBLIC_BASE_URL`** to the address your player actually reaches (see
   *Exposing it*). v1 didn't need it; v2 builds the `/stream/<id>` URLs from it, so
   leaving it unset points the playlist at `localhost` and nothing plays.
-- **Renamed:** `UPDATE_INTERVAL_HOURS` → `CATALOGUE_INTERVAL_HOURS`.
-- **Removed (silently ignored if still set):** `EXCLUDED_CATEGORIES`,
-  `MAX_VIDEOS_PER_CYCLE`, `CONCURRENT_EXTRACTIONS`.
+- **Renamed:** `UPDATE_INTERVAL_HOURS` → `CATALOGUE_INTERVAL_HOURS`; and
+  `EXCLUDED_CATEGORIES` → `EXCLUDE_CATEGORIES` (note: no `D`). The v2 version filters
+  **all** sources on the unified taxonomy, not YouTube's category names — so update the
+  values to the v2 category names (see *Filtering by category*); old names like
+  `Gaming` no longer exist (use `SEARCH_QUERY` exclusions like `-gaming` instead).
+- **Removed (silently ignored if still set):** `MAX_VIDEOS_PER_CYCLE`,
+  `CONCURRENT_EXTRACTIONS`.
 - **Unchanged:** `YOUTUBE_API_KEY`, `SEARCH_QUERY`, `LOG_LEVEL`, and the `23457:8000`
   port mapping.
 
