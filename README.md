@@ -100,7 +100,13 @@ All via environment variables (see `.env.example`):
 | `SEARCH_QUERY` | built-in webcam query | YouTube search terms (`\|`=OR, space=AND, `-`=exclude) |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `PORT` | `8000` | HTTP port inside the container |
-| `SCRAPE_WORKERS` | `min(16, cpu×4)` | Concurrency for scraping + liveness during the catalogue build |
+| `SCRAPE_WORKERS` | `min(16, cpu×4)` | Concurrency for scraping + liveness during the catalogue build. Lower it to reduce peak build-time memory (at the cost of a slower build) |
+
+> **Resource usage:** memory peaks during the periodic catalogue build — it fetches
+> and liveness-checks every source concurrently, then settles back down once the
+> playlist is built (e.g. a transient ~1 GB during the build vs ~270 MB at rest for a
+> ~2000-cam catalogue). The build is the high-water mark; lower `SCRAPE_WORKERS` to
+> cap that peak. Live memory is on `/health` (`rss_mb`).
 
 ## Development
 

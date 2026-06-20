@@ -202,6 +202,10 @@ source collapse (empty-guard). At `DEBUG`, it also logs dropped/failed resolves 
 liveness-probe failures. Live process memory (`rss_mb`) and per-source counts are
 exposed on the `/health` endpoint.
 
+Memory peaks **during** the catalogue build (it fetches + liveness-checks every
+source concurrently) and settles back down once the playlist is built — the build is
+the high-water mark, not a leak. Lower `SCRAPE_WORKERS` to reduce that peak.
+
 ### Viewing Debug Logs
 
 ```bash
