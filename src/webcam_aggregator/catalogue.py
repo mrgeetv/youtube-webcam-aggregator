@@ -14,6 +14,9 @@ log = logging.getLogger("webcam-aggregator.catalogue")
 
 DROP_THRESHOLD = 0.5
 AGREE_TO_ACCEPT = 2
+_NO_EXCLUDE: frozenset[str] = (
+    frozenset()
+)  # default arg (basedpyright: no call in default)
 
 
 @dataclass
@@ -51,6 +54,7 @@ def build_catalogue(
     is_alive: Callable[[Candidate], bool],
     youtube_live: Callable[[Iterable[str]], Mapping[str, str]],
     history: dict[str, Hist],
+    exclude_categories: frozenset[str] = _NO_EXCLUDE,
 ) -> list[CatalogueEntry]:
     # Per source: liveness-filter + per-source empty guard -> kept candidates.
     # Cross-source dedup runs ONCE at the end so the same cam from two sources collapses.
@@ -115,4 +119,10 @@ def build_catalogue(
         h.last_kept = kept
         kept_all.extend(kept)
 
-    return [_to_entry(c) for c in dedupe(kept_all)]
+    entries = [_to_entry(c) for c in dedupe(kept_all)]
+    if exclude_categories:
+        # exclude_categories is casefolded (config._csv_set) for case-insensitive match
+        entries = [
+            e for e in entries if e.category.casefold() not in exclude_categories
+        ]
+    return entries

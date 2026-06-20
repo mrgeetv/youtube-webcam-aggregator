@@ -42,7 +42,9 @@ The app is two phases, decoupled by a catalogue snapshot:
   or `_PROXY_SEGMENT_HOSTS` (segment relay) in `serving.py`, or segments will 403.
 - **Category mapping** lives in `categories.py` (`_MAP`); YouTube categories come
   from the Data API (`videos.list` categoryId) and pass through, everything else
-  maps to the unified taxonomy or "Other".
+  maps to the unified taxonomy or "Other". `EXCLUDE_CATEGORIES` (config) post-filters
+  the built catalogue by mapped category, across all sources. The full excludable set
+  is `categories.ALL_CATEGORIES` — a test guards that the README list matches it.
 
 **Hard-won lessons (don't relearn these):**
 

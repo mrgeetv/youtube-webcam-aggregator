@@ -59,3 +59,11 @@ def map_category(raw: str | None) -> str:
     if raw in _NATIVE_YT:
         return raw
     return "Other"
+
+
+# Every category that can appear as a playlist group-title — i.e. the full set a user
+# may name in EXCLUDE_CATEGORIES. Source of truth; the README list is drift-guarded by
+# a test (tests/categories_test.py).
+ALL_CATEGORIES: tuple[str, ...] = tuple(
+    sorted(set(_MAP.values()) | _NATIVE_YT | {"Other"})
+)

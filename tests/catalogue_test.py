@@ -397,3 +397,33 @@ def test_crash_reuses_last_good_set_and_never_wipes() -> None:
             [src], is_alive=_always_alive, youtube_live=_no_yt_live, history=history
         )
         assert len(result) == 1
+
+
+def test_exclude_categories_drops_matching_entries() -> None:
+    """Entries whose mapped category is excluded are dropped (case-insensitive, matched
+    on the unified category — Birds maps to Animals, so excluding 'animals' drops it).
+    """
+    beach = _make_candidate(
+        source="worldcams",
+        key="hls:b",
+        page="https://example.com/b",
+        target="https://example.com/b.m3u8",
+        category="Beaches",
+        title="Beach Cam",
+    )
+    bird = _make_candidate(
+        source="worldcams",
+        key="hls:r",
+        page="https://example.com/r",
+        target="https://example.com/r.m3u8",
+        category="Birds",
+        title="Bird Cam",
+    )
+    result = build_catalogue(
+        [_Src("worldcams", [beach, bird])],
+        is_alive=_always_alive,
+        youtube_live=_no_yt_live,
+        history={},
+        exclude_categories=frozenset({"animals"}),
+    )
+    assert {e.title for e in result} == {"Beach Cam"}

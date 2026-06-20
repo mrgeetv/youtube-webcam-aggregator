@@ -351,6 +351,7 @@ def build_app(
             is_alive=is_alive,
             youtube_live=youtube_live,
             history=history,
+            exclude_categories=cfg.exclude_categories,
         )
         store.swap(entries)
         log.info("catalogue rebuilt: %d entries", len(entries))

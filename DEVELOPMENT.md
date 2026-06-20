@@ -48,6 +48,7 @@ Configure these in your `.env` file or pass directly to docker-compose:
 | `PUBLIC_BASE_URL` | `http://localhost:8000` | Base URL used in playlist and manifest links |
 | `CATALOGUE_INTERVAL_HOURS` | `6` | Hours between catalogue refresh cycles |
 | `SEARCH_QUERY` | built-in webcam query | YouTube search terms (`\|`=OR, space=AND, `-`=exclude) |
+| `EXCLUDE_CATEGORIES` | (none) | Comma-separated categories to drop across all sources (case-insensitive) |
 | `LOG_LEVEL` | `INFO` | Logging verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `PORT` | `8000` | HTTP port inside the container |
 | `SCRAPE_WORKERS` | `min(16, cpu×4)` | Concurrency for scraping + liveness during the catalogue build |

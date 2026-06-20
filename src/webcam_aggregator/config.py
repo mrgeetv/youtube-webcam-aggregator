@@ -18,6 +18,7 @@ class Config:
     search_query: str
     log_level: str
     port: int
+    exclude_categories: frozenset[str]
 
 
 def _int_env(env: dict[str, str], key: str, default: int, minimum: int) -> int:
@@ -25,6 +26,11 @@ def _int_env(env: dict[str, str], key: str, default: int, minimum: int) -> int:
         return max(minimum, int(env.get(key, str(default))))
     except ValueError:
         return default
+
+
+def _csv_set(raw: str) -> frozenset[str]:
+    # Comma-separated, stored casefolded so category matching is case-insensitive.
+    return frozenset(p.strip().casefold() for p in raw.split(",") if p.strip())
 
 
 def load(env: dict[str, str] | None = None) -> Config:
@@ -39,4 +45,5 @@ def load(env: dict[str, str] | None = None) -> Config:
         search_query=e.get("SEARCH_QUERY", "").strip() or _DEFAULT_SEARCH_QUERY,
         log_level=e.get("LOG_LEVEL", "INFO").strip().upper() or "INFO",
         port=_int_env(e, "PORT", 8000, 1),
+        exclude_categories=_csv_set(e.get("EXCLUDE_CATEGORIES", "")),
     )

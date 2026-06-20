@@ -103,6 +103,7 @@ All via environment variables (see `.env.example`):
 | `PUBLIC_BASE_URL` | `http://localhost:8000` | Externally-reachable base for the emitted URLs |
 | `CATALOGUE_INTERVAL_HOURS` | `6` | Hours between catalogue refreshes (min 1) |
 | `SEARCH_QUERY` | built-in webcam query | YouTube search terms (`\|`=OR, space=AND, `-`=exclude) |
+| `EXCLUDE_CATEGORIES` | (none) | Comma-separated categories to drop, across all sources, case-insensitive. See *Filtering by category* |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `PORT` | `8000` | HTTP port inside the container |
 | `SCRAPE_WORKERS` | `min(16, cpu×4)` | Concurrency for scraping + liveness during the catalogue build. Lower it to reduce peak build-time memory (at the cost of a slower build) |
@@ -141,6 +142,25 @@ Tips:
   most effective way to filter out non-webcam noise.
 - Leave `SEARCH_QUERY` unset to use the built-in default (a broad webcam query with
   sensible exclusions already baked in).
+
+## Filtering by category
+
+`EXCLUDE_CATEGORIES` drops whole categories (comma-separated, case-insensitive).
+Unlike `SEARCH_QUERY` it applies to **every source** — it filters on the unified
+category each cam is mapped to. For example, `EXCLUDE_CATEGORIES=Religion,Sports` drops
+every religion and sports cam regardless of which source it came from.
+
+The available categories are:
+
+```text
+Airports, Animals, Aquariums, Bars & Nightlife, Beaches, Cities, Education,
+Entertainment, Hotels, Landmarks, Mountains, Music, Nature & Parks, News & Politics,
+Nonprofits & Activism, Other, People & Blogs, Ports & Ships, Religion,
+Science & Technology, Seasonal, Space, Sports, Studios, Traffic, Trains & Railways,
+Travel & Events, Water & Waterways
+```
+
+`Other` catches anything that didn't map to a known category.
 
 ## Upgrading from v1
 

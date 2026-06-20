@@ -42,3 +42,14 @@ def test_new_fields_from_env():
     assert c.search_query == "trains|railway"
     assert c.log_level == "DEBUG"  # normalised to upper-case
     assert c.port == 9000
+
+
+def test_exclude_categories_parsed_casefolded():
+    c = config.load(
+        {"YOUTUBE_API_KEY": "k", "EXCLUDE_CATEGORIES": "Religion, Sports ,music"}
+    )
+    assert c.exclude_categories == frozenset({"religion", "sports", "music"})
+
+
+def test_exclude_categories_default_empty():
+    assert config.load({"YOUTUBE_API_KEY": "k"}).exclude_categories == frozenset()
