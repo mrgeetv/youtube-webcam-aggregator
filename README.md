@@ -1,12 +1,12 @@
 # Live Webcam Aggregator
 
-Turn live webcams from across the web into your own IPTV channel list.
+Turn live webcams from across the web into a single, categorised **M3U8 playlist**
+you can open in any M3U8/HLS-capable player.
 
-It discovers live webcam streams from multiple sources, merges and de-duplicates
-them into a single categorised **M3U8 playlist**, and serves it over HTTP for any
-IPTV player (TiViMate, VLC, smart TVs, and similar). Streams are resolved **on
-demand** when a channel is opened, so the playlist stays current and the server
-only does work when a stream is played.
+It discovers live webcam streams from multiple sources, merges and de-duplicates them
+into one playlist, and serves it over HTTP. Streams are resolved **on demand** when a
+channel is opened, so the playlist stays current and the server only does work when a
+stream is actually played.
 
 ## Sources
 
@@ -20,9 +20,11 @@ The same camera found on more than one source is merged into a single channel.
 
 ## How it works
 
-- **Catalogue build** (periodic, slow): each source is crawled, dead streams are
-  dropped, survivors are de-duplicated, mapped to a unified category, and written
-  into a playlist of stable internal URLs.
+- **Catalogue build** (periodic): every `CATALOGUE_INTERVAL_HOURS`, each source is
+  crawled, dead streams are dropped, survivors are de-duplicated, mapped to a unified
+  category, and written into a playlist of stable internal URLs. This is the slow
+  part — roughly **6–7 minutes** for a ~2000-cam catalogue (scales with how big the
+  sources are and with `SCRAPE_WORKERS`).
 - **On-demand serving**: when a player opens a channel, the container resolves the
   stream on request and proxies the HLS manifest, refreshing expiring tokens
   transparently so long sessions keep playing. For most cams the video segments
@@ -52,15 +54,16 @@ The playlist is then available at `http://localhost:23457/playlist.m3u8`. The fi
 catalogue build takes a few minutes (discovery + liveness checks); until it's ready,
 `/playlist.m3u8` returns `503`.
 
-## Adding it to TiViMate (or any IPTV player)
+## Adding it to a player
 
-It's a standard M3U8 playlist, so:
+It's a standard M3U8/HLS playlist, so it works in anything that can open one — media
+players (VLC, mpv), IPTV apps, smart-TV apps, and similar:
 
 1. Make sure the container is reachable at the address your player will use, and set
    **`PUBLIC_BASE_URL`** to that address (see *Exposing it* below) — the playlist hands
    out `/stream/<id>` URLs that must be reachable by the player.
-2. In **TiViMate**: *Settings → Playlists → Add playlist → Enter URL* → paste
-   `https://<your-address>/playlist.m3u8` → *Next*. Channels load, grouped by category.
+2. Point the player at `https://<your-address>/playlist.m3u8`. Channels load, grouped
+   by category.
 3. Open a channel — the stream is resolved on demand and begins playing.
 
 Notes:
@@ -70,8 +73,8 @@ Notes:
 - There's no EPG — webcams have no schedule, so they appear as channels without a guide.
 - Each channel carries a stable `tvg-id`, so favourites stay linked to the right cam
   across catalogue refreshes — even as the total channel count changes.
-- Designed and tested against HLS/ExoPlayer-based players (TiViMate, VLC). Try one
-  channel first to confirm your player + network path.
+- Tested with HLS/ExoPlayer-based players (e.g. TiViMate, VLC). Try one channel first
+  to confirm your player + network path.
 
 ## Exposing it
 
@@ -109,6 +112,35 @@ All via environment variables (see `.env.example`):
 > playlist is built (e.g. a transient ~1 GB during the build vs ~270 MB at rest for a
 > ~2000-cam catalogue). The build is the high-water mark; lower `SCRAPE_WORKERS` to
 > cap that peak. Live memory is on `/health` (`rss_mb`).
+
+## Tuning the search query
+
+`SEARCH_QUERY` shapes **only the YouTube source** — the scraped directories
+(worldcams.tv, cxtvlive.com) are taken as-is. It's passed to YouTube search with a
+simple syntax:
+
+- `|` = OR — `beach|harbor|coast` matches any of them
+- space = AND — `live cam` requires both words
+- `-` = exclude — `-gaming -asmr` drops results that mention those terms
+
+Examples:
+
+```text
+# Nature & wildlife
+SEARCH_QUERY=animal|wildlife|bird|nature|zoo|aquarium|safari|live|cam -gameplay -gaming
+
+# Transport
+SEARCH_QUERY=train|railway|airport|harbor|traffic|ferry|live|cam -gameplay -gaming
+```
+
+Tips:
+
+- **Less is more** — piling on terms tends to *narrow* results and make them worse,
+  not wider. Start broad, then add a few exclusions.
+- **Exclusions do the heavy lifting** — `-gaming -asmr -reaction`-style terms are the
+  most effective way to filter out non-webcam noise.
+- Leave `SEARCH_QUERY` unset to use the built-in default (a broad webcam query with
+  sensible exclusions already baked in).
 
 ## Upgrading from v1
 
