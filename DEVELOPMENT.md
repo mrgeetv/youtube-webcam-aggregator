@@ -101,6 +101,13 @@ Hooks will run automatically on commit, checking:
 - Dockerfile linting (hadolint)
 - Markdown formatting (markdownlint)
 - Conventional commit messages
+- Type checking (basedpyright)
+- **Tests + coverage (pytest)** — runs the full suite with a coverage floor when
+  `src/`, `tests/`, or `requirements*.txt` change
+
+> **Note:** the `pytest` hook calls `pytest` directly, so your dev virtualenv must
+> be active (or otherwise on `PATH`) when committing. The same checks run in CI on
+> every pull request, so nothing merges without the tests passing.
 
 To run hooks manually:
 

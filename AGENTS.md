@@ -55,7 +55,8 @@ network controls.
 
 **Tests:** files are `*_test.py` (the `name-tests-test` hook rejects `test_*.py`);
 real-endpoint tests are marked `@pytest.mark.live` and excluded by default
-(`pytest.ini`). The gate is `pre-commit` + `pytest`, not ruff/mypy.
+(`pytest.ini`). The gate is `pre-commit` (which now runs `pytest` + a coverage
+floor as a hook) plus the same checks in CI — not ruff/mypy.
 
 ## Branching Workflow
 
@@ -151,6 +152,7 @@ Pre-commit hooks enforced:
 - **conventional-pre-commit** - Commit message validation (strict mode with forced scopes)
 - **check-python-version** - Custom validation that .python-version matches Dockerfile, docker-compose.yml, and pyrightconfig.json
 - **basedpyright** - Python type checking (stricter pyright fork with pylance features)
+- **pytest** - Full test suite + coverage floor (`--cov-fail-under`); runs when `src/`, `tests/`, or `requirements*.txt` change. Calls `pytest` directly, so the dev venv must be on `PATH` when committing. Also runs in CI.
 
 ## Python Version Synchronization
 
