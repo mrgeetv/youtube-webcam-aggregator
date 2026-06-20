@@ -33,6 +33,22 @@ log = logging.getLogger("webcam-aggregator")
 _HLS_CT = "application/vnd.apple.mpegurl"
 
 
+def _total_rss() -> int:
+    """RSS of this process plus any live child processes (yt-dlp/deno spawned per
+    resolve), so /health reflects the container footprint, not just the parent."""
+    p = psutil.Process()
+    total = p.memory_info().rss
+    try:
+        for child in p.children(recursive=True):
+            try:
+                total += child.memory_info().rss
+            except psutil.Error:
+                pass  # child exited between listing and measuring
+    except psutil.Error:
+        pass
+    return total
+
+
 def origin_of(url: str) -> str:
     p = urllib.parse.urlsplit(url)
     return f"{p.scheme}://{p.hostname}/"
@@ -237,7 +253,7 @@ def make_handler(
                     "ready": store.ready,
                     "streams": len(snapshot),
                     "sources": source_counts(),
-                    "rss_mb": round(psutil.Process().memory_info().rss / 1048576, 1),
+                    "rss_mb": round(_total_rss() / 1048576, 1),
                 }
                 self._respond(200, "application/json", json.dumps(payload).encode())
                 return
