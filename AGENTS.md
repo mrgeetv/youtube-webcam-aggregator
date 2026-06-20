@@ -64,15 +64,20 @@ The app is two phases, decoupled by a catalogue snapshot:
   by `publishedBefore` time-windows instead (walking back from the last item's
   `publishedAt`) to reach the deeper hundreds; `pageToken` silently caps you at ~100.
 
-**Security model:** every outbound fetch goes through `fetch.is_safe_url` (rejects
-non-http(s) and private/loopback/link-local IPs), an 8 MB cap, and **per-hop redirect
-re-validation** (in both the `requests` `Fetcher` and the `urllib` `_OPENER`); proxied
-`/m` and `/s` URLs are HMAC-signed (`signing.py`) so only server-emitted URLs are
-fetched. **Known residuals** (mitigate by running behind your own network controls):
-(1) **DNS-rebinding TOCTOU** — `is_safe_url` resolves, then the HTTP lib re-resolves
-at connect; durable fix = connection-level IP pinning. (2) **egress-proxy surface** —
-the proxy will sign + fetch any *public* host that appears in an upstream manifest;
-durable fix = a CDN-host allowlist on the rewritten `/m`/`/s` URLs.
+**Security model:** every outbound fetch is validated by `fetch._resolve_validated_ip`
+(rejects non-http(s) and private/loopback/link-local/reserved IPs), an 8 MB cap, and
+**per-hop redirect re-validation** in the `requests` `Fetcher`; proxied `/m` and `/s`
+URLs are HMAC-signed (`signing.py`) so only server-emitted URLs are fetched.
+**DNS-rebinding TOCTOU is now closed in-app** (no firewall needed): the `Fetcher`
+resolves+validates the host once (`_resolve_validated_ip`) and then **pins the
+connection to that validated IP** (curl `--resolve` style, via `_PinnedHostAdapter`
+on a call-local `requests.Session`), so the HTTP lib never re-resolves between check
+and connect. TLS is **not** weakened — the socket goes to the pinned IP but SNI
+(`server_hostname`) and certificate hostname matching (`assert_hostname`) stay bound
+to the original hostname, and `verify` stays on. **Known residual** (mitigate by
+running behind your own network controls): the **egress-proxy surface** — the proxy
+will sign + fetch any *public* host that appears in an upstream manifest; durable
+fix = a CDN-host allowlist on the rewritten `/m`/`/s` URLs.
 
 **Tests:** files are `*_test.py` (the `name-tests-test` hook rejects `test_*.py`).
 The suite is **fully offline** — no real-endpoint/live tests (sources, resolvers,

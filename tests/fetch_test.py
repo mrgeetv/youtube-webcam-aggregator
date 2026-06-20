@@ -2,11 +2,19 @@ from __future__ import annotations
 
 import logging
 import socket
+import time
 from unittest.mock import patch
 
 import pytest
+import requests
 
-from webcam_aggregator.fetch import Fetcher, is_safe_url, resolve_scrape_workers
+from webcam_aggregator import fetch
+from webcam_aggregator.fetch import (
+    Fetcher,
+    _PinnedHostAdapter,  # pyright: ignore[reportPrivateUsage]
+    _resolve_validated_ip,  # pyright: ignore[reportPrivateUsage]
+    resolve_scrape_workers,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -18,87 +26,93 @@ def _mock_getaddrinfo(ip: str):
     return [(None, None, None, None, (ip, 0))]
 
 
+def _url_is_safe(url: str) -> bool:
+    """Test predicate over the real gate: True iff the URL resolves to a non-private
+    IP (i.e. the Fetcher would be allowed to fetch it)."""
+    return _resolve_validated_ip(url) is not None
+
+
 # ---------------------------------------------------------------------------
-# is_safe_url — private/reserved addresses must be blocked
+# URL safety (_resolve_validated_ip) — private/reserved addresses must be blocked
 # ---------------------------------------------------------------------------
 
 
-def test_is_safe_url_blocks_link_local() -> None:
+def test_url_safety_blocks_link_local() -> None:
     with patch(
         "webcam_aggregator.fetch.socket.getaddrinfo",
         return_value=_mock_getaddrinfo("169.254.169.254"),
     ):
-        assert is_safe_url("http://169.254.169.254/latest/meta-data/") is False
+        assert _url_is_safe("http://169.254.169.254/latest/meta-data/") is False
 
 
-def test_is_safe_url_blocks_loopback() -> None:
+def test_url_safety_blocks_loopback() -> None:
     with patch(
         "webcam_aggregator.fetch.socket.getaddrinfo",
         return_value=_mock_getaddrinfo("127.0.0.1"),
     ):
-        assert is_safe_url("http://127.0.0.1/") is False
+        assert _url_is_safe("http://127.0.0.1/") is False
 
 
-def test_is_safe_url_blocks_private_10() -> None:
+def test_url_safety_blocks_private_10() -> None:
     with patch(
         "webcam_aggregator.fetch.socket.getaddrinfo",
         return_value=_mock_getaddrinfo("10.0.0.1"),
     ):
-        assert is_safe_url("http://10.0.0.1/") is False
+        assert _url_is_safe("http://10.0.0.1/") is False
 
 
-def test_is_safe_url_blocks_private_192_168() -> None:
+def test_url_safety_blocks_private_192_168() -> None:
     with patch(
         "webcam_aggregator.fetch.socket.getaddrinfo",
         return_value=_mock_getaddrinfo("192.168.1.1"),
     ):
-        assert is_safe_url("http://192.168.1.1/") is False
+        assert _url_is_safe("http://192.168.1.1/") is False
 
 
-def test_is_safe_url_blocks_file_scheme() -> None:
+def test_url_safety_blocks_file_scheme() -> None:
     # file:// must be rejected regardless of DNS
-    assert is_safe_url("file:///etc/passwd") is False
+    assert _url_is_safe("file:///etc/passwd") is False
 
 
-def test_is_safe_url_blocks_ftp_scheme() -> None:
-    assert is_safe_url("ftp://example.com/x") is False
+def test_url_safety_blocks_ftp_scheme() -> None:
+    assert _url_is_safe("ftp://example.com/x") is False
 
 
-def test_is_safe_url_allows_public_host() -> None:
+def test_url_safety_allows_public_host() -> None:
     # Monkeypatch so the test is offline and deterministic
     with patch(
         "webcam_aggregator.fetch.socket.getaddrinfo",
         return_value=_mock_getaddrinfo("93.184.216.34"),  # example.com's public IP
     ):
-        assert is_safe_url("https://example.com/x") is True
+        assert _url_is_safe("https://example.com/x") is True
 
 
-def test_is_safe_url_dns_failure_returns_false() -> None:
+def test_url_safety_dns_failure_returns_false() -> None:
     with patch(
         "webcam_aggregator.fetch.socket.getaddrinfo",
         side_effect=socket.gaierror("nxdomain"),
     ):
-        assert is_safe_url("https://this.does.not.exist.example/") is False
+        assert _url_is_safe("https://this.does.not.exist.example/") is False
 
 
-def test_is_safe_url_no_host_returns_false() -> None:
-    assert is_safe_url("https:///path") is False
+def test_url_safety_no_host_returns_false() -> None:
+    assert _url_is_safe("https:///path") is False
 
 
-def test_is_safe_url_blocks_ipv6_loopback() -> None:
+def test_url_safety_blocks_ipv6_loopback() -> None:
     with patch(
         "webcam_aggregator.fetch.socket.getaddrinfo",
         return_value=_mock_getaddrinfo("::1"),
     ):
-        assert is_safe_url("http://[::1]/") is False
+        assert _url_is_safe("http://[::1]/") is False
 
 
-def test_is_safe_url_blocks_multicast() -> None:
+def test_url_safety_blocks_multicast() -> None:
     with patch(
         "webcam_aggregator.fetch.socket.getaddrinfo",
         return_value=_mock_getaddrinfo("224.0.0.1"),
     ):
-        assert is_safe_url("http://multicast.example/") is False
+        assert _url_is_safe("http://multicast.example/") is False
 
 
 # ---------------------------------------------------------------------------
@@ -490,3 +504,274 @@ def test_scrape_workers_valid_value_no_warning(
         result = resolve_scrape_workers()
     assert result == 6
     assert caplog.text == ""
+
+
+# ---------------------------------------------------------------------------
+# DNS-rebinding TOCTOU: validate-then-pin-IP (curl --resolve pattern)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_validated_ip_rejects_private(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Any private/loopback resolved IP poisons the host → no IP returned."""
+    monkeypatch.setattr(
+        "webcam_aggregator.fetch.socket.getaddrinfo",
+        lambda *_a, **_k: _mock_getaddrinfo("10.0.0.1"),
+    )
+    assert _resolve_validated_ip("http://internal.example/") is None
+
+
+def test_resolve_validated_ip_returns_public(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A safe public host resolves to a concrete IP that the caller will pin to."""
+    monkeypatch.setattr(
+        "webcam_aggregator.fetch.socket.getaddrinfo",
+        lambda *_a, **_k: _mock_getaddrinfo("93.184.216.34"),
+    )
+    assert _resolve_validated_ip("https://example.com/x") == "93.184.216.34"
+
+
+def test_pinned_adapter_connects_to_ip_keeps_hostname_for_tls() -> None:
+    """The pin seam: TCP target is the validated IP, but SNI + cert hostname
+    matching (server_hostname / assert_hostname) stay bound to the ORIGINAL host."""
+    adapter = _PinnedHostAdapter("cam.example", "203.0.113.7")
+    captured: dict[str, object] = {}
+
+    def fake_connection_from_host(**kwargs: object) -> object:
+        captured.update(kwargs)
+        return object()
+
+    # poolmanager is created in HTTPAdapter.__init__; intercept its factory.
+    adapter.poolmanager.connection_from_host = fake_connection_from_host  # type: ignore[method-assign]
+    req = requests.PreparedRequest()
+    req.prepare(method="GET", url="https://cam.example/playlist.m3u8")
+
+    adapter.get_connection_with_tls_context(req, verify=True)
+
+    # Connect to the pinned IP, not the hostname.
+    assert captured["host"] == "203.0.113.7"
+    assert captured["scheme"] == "https"
+    pool_kwargs = captured["pool_kwargs"]
+    assert isinstance(pool_kwargs, dict)
+    # TLS stays bound to the hostname: SNI + cert hostname match use the host.
+    assert pool_kwargs["server_hostname"] == "cam.example"
+    assert pool_kwargs["assert_hostname"] == "cam.example"
+
+
+def test_pinned_adapter_http_pins_ip_without_tls_kwargs() -> None:
+    """For plain http:// the IP is still pinned, but the TLS-only kwargs
+    (server_hostname/assert_hostname) must NOT be set — a plain HTTPConnection
+    rejects them and would raise TypeError at connect time."""
+    adapter = _PinnedHostAdapter("cam.example", "203.0.113.7")
+    captured: dict[str, object] = {}
+
+    def fake_connection_from_host(**kwargs: object) -> object:
+        captured.update(kwargs)
+        return object()
+
+    adapter.poolmanager.connection_from_host = fake_connection_from_host  # type: ignore[method-assign]
+    req = requests.PreparedRequest()
+    req.prepare(method="GET", url="http://cam.example/playlist.m3u8")
+
+    adapter.get_connection_with_tls_context(req, verify=True)
+
+    assert captured["host"] == "203.0.113.7"
+    assert captured["scheme"] == "http"
+    pool_kwargs = captured["pool_kwargs"]
+    assert isinstance(pool_kwargs, dict)
+    assert "server_hostname" not in pool_kwargs
+    assert "assert_hostname" not in pool_kwargs
+
+
+def test_fetcher_pins_to_validated_ip_not_a_second_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Rebinding simulation: the resolver returns a PUBLIC IP at validation time;
+    the connection must be made to THAT pinned IP via the adapter, with SNI/Host
+    still the original hostname — never a fresh lookup at connect time."""
+    monkeypatch.setattr(
+        "webcam_aggregator.fetch.socket.getaddrinfo",
+        lambda *_a, **_k: _mock_getaddrinfo("93.184.216.34"),
+    )
+
+    seen: dict[str, object] = {}
+    real_init = _PinnedHostAdapter.__init__
+
+    def spy_init(self: _PinnedHostAdapter, host: str, ip: str) -> None:
+        seen["host"] = host
+        seen["ip"] = ip
+        real_init(self, host, ip)
+
+    monkeypatch.setattr(_PinnedHostAdapter, "__init__", spy_init)
+
+    class _OkResp:
+        is_redirect: bool = False
+        is_permanent_redirect: bool = False
+
+        def raise_for_status(self) -> None: ...
+
+        def iter_content(self, _n: int) -> object:
+            return iter([b"#EXTM3U"])
+
+        def close(self) -> None: ...
+
+    monkeypatch.setattr("requests.Session.get", lambda _self, _url, **_k: _OkResp())
+
+    f = Fetcher(delay=0.0, retries=1)
+    assert f.get("https://cam.example/playlist.m3u8") == "#EXTM3U"
+    # The adapter was pinned to the IP chosen at validation, host kept for TLS/Host.
+    assert seen["ip"] == "93.184.216.34"
+    assert seen["host"] == "cam.example"
+
+
+def test_fetcher_get_blocks_private_resolution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Fetcher.get must make no connection when the host resolves to a private IP."""
+    monkeypatch.setattr(
+        "webcam_aggregator.fetch.socket.getaddrinfo",
+        lambda *_a, **_k: _mock_getaddrinfo("127.0.0.1"),
+    )
+    called = [False]
+
+    def fake_get(_self: object, _url: str, **_k: object) -> None:
+        called[0] = True
+
+    monkeypatch.setattr("requests.Session.get", fake_get)
+    f = Fetcher(delay=0.0, retries=1)
+    assert f.get("https://rebind.example/playlist.m3u8") is None
+    assert not called[0]
+
+
+def test_fetcher_tls_verified_against_hostname_while_connecting_to_ip(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """End-to-end proof (offline, real sockets): stand up an HTTPS server on
+    127.0.0.1:0 with a self-signed cert for hostname 'pinned.test'. Resolver maps
+    'pinned.test' -> 127.0.0.1. The Fetcher must connect to the pinned IP yet
+    complete the TLS handshake by validating the cert AGAINST THE HOSTNAME.
+
+    This is the regression guard for the hard requirement: connecting to the IP
+    must not weaken TLS. If cert validation were done against the IP (or disabled),
+    this fetch would fail."""
+    import http.server
+    import ssl
+    import tempfile
+    import threading
+
+    crypto = pytest.importorskip("cryptography")
+    from datetime import datetime, timedelta, timezone
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
+
+    hostname = "pinned.test"
+
+    # --- self-signed cert with SAN = pinned.test ---
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, hostname)])
+    now = datetime.now(timezone.utc)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(days=1))
+        .not_valid_after(now + timedelta(days=1))
+        .add_extension(
+            x509.SubjectAlternativeName([x509.DNSName(hostname)]), critical=False
+        )
+        .sign(key, hashes.SHA256())
+    )
+    assert crypto  # importorskip handle, silence vulture
+
+    tmp = tempfile.TemporaryDirectory()
+    cert_path = f"{tmp.name}/cert.pem"
+    key_path = f"{tmp.name}/key.pem"
+    with open(cert_path, "wb") as fh:
+        fh.write(cert.public_bytes(serialization.Encoding.PEM))
+    with open(key_path, "wb") as fh:
+        fh.write(
+            key.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.TraditionalOpenSSL,
+                serialization.NoEncryption(),
+            )
+        )
+
+    class _Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"#EXTM3U pinned-ok")
+
+        def log_message(  # noqa: A002 # pyright: ignore[reportImplicitOverride]
+            self, format: str, *args: object
+        ) -> None: ...
+
+    httpd = http.server.HTTPServer(("127.0.0.1", 0), _Handler)
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(cert_path, key_path)
+    httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
+    port = httpd.server_address[1]
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+
+    # Wait until the listener actually accepts a TCP connection before fetching
+    # (avoids a race where the worker thread hasn't entered accept() yet).
+    for _ in range(100):
+        try:
+            socket.create_connection(("127.0.0.1", port), timeout=0.5).close()
+            break
+        except OSError:
+            time.sleep(0.02)
+
+    try:
+        # Resolver: hostname -> loopback. The Fetcher pins the connection here.
+        # NOTE: fetch.socket IS the global socket module, so this patch is also
+        # seen by urllib3's real socket layer — return a fully-shaped addrinfo
+        # tuple (proper family/type/proto) so the actual loopback connect works.
+        def _loopback_addrinfo(*_a: object, **_k: object) -> list[tuple[object, ...]]:
+            return [
+                (
+                    socket.AF_INET,
+                    socket.SOCK_STREAM,
+                    socket.IPPROTO_TCP,
+                    "",
+                    ("127.0.0.1", port),
+                )
+            ]
+
+        monkeypatch.setattr(
+            "webcam_aggregator.fetch.socket.getaddrinfo", _loopback_addrinfo
+        )
+        # _resolve_validated_ip would normally reject loopback; bypass ONLY the IP-safety
+        # gate for this connectivity test (we are deliberately dialing loopback)
+        # while leaving the pin + TLS path fully real.
+        monkeypatch.setattr("webcam_aggregator.fetch._ip_is_unsafe", lambda _ip: False)
+
+        # Trust our self-signed CA so the cert validates AGAINST THE HOSTNAME.
+        # Fetcher builds the session internally, so wrap _pinned_session to set
+        # the CA bundle (equivalent to the production default verify=True, just
+        # pointed at our test CA) — we never disable verification.
+        ps = "_pinned_session"
+        real_pinned_session = getattr(fetch, ps)
+
+        def pinned_with_test_ca(host: str, ip: str) -> requests.Session:
+            session = real_pinned_session(host, ip)
+            session.verify = cert_path
+            return session
+
+        monkeypatch.setattr(
+            "webcam_aggregator.fetch._pinned_session", pinned_with_test_ca
+        )
+
+        f = Fetcher(delay=0.0, retries=1)
+        body = f.get(f"https://{hostname}:{port}/playlist.m3u8")
+        assert body == "#EXTM3U pinned-ok"
+    finally:
+        httpd.shutdown()
+        thread.join(timeout=5)
+        tmp.cleanup()

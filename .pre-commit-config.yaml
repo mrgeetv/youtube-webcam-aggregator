@@ -95,14 +95,16 @@ repos:
         pass_filenames: false
         files: '^src/'
         # confidence 60 catches dead functions/attributes/fields (not just imports,
-        # which flake8/basedpyright already get). Framework-dispatched handler
-        # methods are false positives — ignore them by name.
+        # which flake8/basedpyright already get). Framework-dispatched methods are
+        # false positives, ignored by name: do_GET/log_message (HTTP handler) and
+        # get_connection_with_tls_context (a requests HTTPAdapter override, called
+        # by requests, not by us).
         args:
           - "src/webcam_aggregator/"
           - "--min-confidence"
           - "60"
           - "--ignore-names"
-          - "do_GET,log_message"
+          - "do_GET,log_message,get_connection_with_tls_context"
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
     rev: v0.22.1
