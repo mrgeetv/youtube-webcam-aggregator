@@ -59,32 +59,38 @@ def _predisc_key(target: str) -> str | None:
     return None
 
 
-def location_from_url(page_url: str) -> str:
-    """Geographic hint from a scraped cam URL path.
+def _norm(s: str) -> str:
+    """Lower-case, drop apostrophes, punctuation -> spaces (for substring matching)."""
+    s = s.lower().replace("'", "").replace("’", "")
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", s)).strip()
 
-    worldcams /<country>/<place>/<name> and /<country>/<slug> both use the 2nd path
-    segment as the distinguisher -> "<2nd>, <Country>". cxtvlive /live-camera/<slug>
-    -> "Slug".
-    """
+
+def _location_parts(page_url: str) -> list[str]:
+    """Prettified URL path segments, general -> specific (country, place, name)."""
     path = urlsplit(page_url).path.strip("/")
-    pretty = [
+    return [
         s.replace("-", " ").title() for s in path.split("/") if s and s != "live-camera"
     ]
-    if len(pretty) >= 2:
-        return f"{pretty[1]}, {pretty[0]}"
-    if pretty:
-        return pretty[0]
-    return ""
+
+
+def location_from_url(page_url: str) -> str:
+    """Full location, most-specific first: "Skid Row, Los Angeles, United States"."""
+    return ", ".join(reversed(_location_parts(page_url)))
 
 
 def with_location(title: str, page_url: str) -> str:
-    """Append the URL-derived location unless the title already names it."""
-    loc = location_from_url(page_url)
+    """Append the URL location segments the title doesn't already name.
+
+    worldcams h1s usually already include the place, so we only add what's new
+    (e.g. the country) — avoiding "Dusseldorf Airport — Dusseldorf, Germany" — while
+    still distinguishing generic titles ("Italy Beaches — Cinque Terre").
+    """
+    parts = _location_parts(page_url)
     if not title.strip():
-        return loc or title
-    if loc and loc.lower() not in title.lower():
-        return f"{title} — {loc}"
-    return title
+        return location_from_url(page_url) or title
+    nt = _norm(title)
+    extra = [p for p in reversed(parts) if _norm(p) and _norm(p) not in nt]
+    return f"{title} — {', '.join(extra)}" if extra else title
 
 
 def extract_candidates(html: str, *, page_url: str, source: str) -> Iterator[Candidate]:

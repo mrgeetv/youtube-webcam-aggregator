@@ -19,7 +19,7 @@ _LIST = (
     '<a href="/norway/finse/railroad-station">A</a></div>'
 )
 _CAM = (
-    "<h1>Finse Railroad</h1>"
+    "<h1>Finse Railroad Station</h1>"
     'Category: &nbsp;<a href="/trains/">Trains</a>'
     'streams[0] = "<iframe src=\\"https://www.youtube.com/embed/aaaaaaaaaaa\\"></iframe>";'
 )
@@ -35,8 +35,8 @@ def test_discovers_with_title_and_category() -> None:
     cands = list(WorldcamsSource(fetch=fetcher).discover())
     assert cands
     assert all(c.source == "worldcams" for c in cands)
-    # location from the URL path is appended for geographic context
-    assert cands[0].title == "Finse Railroad — Finse, Norway"
+    # only the parts the h1 doesn't already name are appended (place is in the h1)
+    assert cands[0].title == "Finse Railroad Station — Norway"
     assert cands[0].category == "Trains"
     assert cands[0].predisc_key == "yt:aaaaaaaaaaa"
 

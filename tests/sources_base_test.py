@@ -7,8 +7,11 @@ from webcam_aggregator.sources.base import (
 
 def test_location_from_url():
     base = "https://worldcams.tv"
-    assert location_from_url(f"{base}/italy/venice/rialto-bridge") == "Venice, Italy"
-    # 2-segment URLs use the 2nd (distinguishing) segment, not just the country
+    # full path, most-specific first
+    assert (
+        location_from_url(f"{base}/italy/venice/rialto-bridge")
+        == "Rialto Bridge, Venice, Italy"
+    )
     assert (
         location_from_url(f"{base}/barbados/barbados-beaches")
         == "Barbados Beaches, Barbados"
@@ -20,16 +23,36 @@ def test_location_from_url():
     assert location_from_url("https://worldcams.tv/") == ""
 
 
-def test_with_location_appends_and_dedupes():
-    url = "https://worldcams.tv/italy/cinque-terre/beach"
-    # generic title gains the location
-    assert with_location("Italy Beaches Webcam", url) == (
-        "Italy Beaches Webcam — Cinque Terre, Italy"
+def test_with_location_appends_only_new_parts():
+    wc = "https://worldcams.tv"
+    # generic title gains the distinguishing place (redundant country/word dropped)
+    assert (
+        with_location("Italy Beaches Webcam", f"{wc}/italy/cinque-terre/beach")
+        == "Italy Beaches Webcam — Cinque Terre"
     )
-    # no double-up when the title already names the place
-    assert with_location("Cinque Terre, Italy cam", url) == "Cinque Terre, Italy cam"
-    # empty title falls back to the location alone
-    assert with_location("", url) == "Cinque Terre, Italy"
+    # h1 already names the place -> only the country is added (no double-up)
+    assert (
+        with_location("Dusseldorf Airport Webcam", f"{wc}/germany/dusseldorf/airport")
+        == "Dusseldorf Airport Webcam — Germany"
+    )
+    # apostrophes/parens normalised so the place still dedupes
+    assert (
+        with_location(
+            "Hog's Breath Saloon (Key West) Webcam",
+            f"{wc}/united-states/key-west/hogs-breath-saloon",
+        )
+        == "Hog's Breath Saloon (Key West) Webcam — United States"
+    )
+    # title already names everything -> no suffix
+    assert (
+        with_location("Cinque Terre Beach Italy", f"{wc}/italy/cinque-terre/beach")
+        == "Cinque Terre Beach Italy"
+    )
+    # empty title -> full location, most-specific first
+    assert (
+        with_location("", f"{wc}/italy/cinque-terre/beach")
+        == "Beach, Cinque Terre, Italy"
+    )
 
 
 def test_ignores_source_attribution_link():
