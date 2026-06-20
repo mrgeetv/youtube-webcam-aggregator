@@ -50,6 +50,13 @@ COPY --from=builder /deps /deps
 # Copy application package
 COPY src/webcam_aggregator/ ./src/webcam_aggregator/
 
+# Run as a non-root user (defense-in-depth). Numeric UID works on both the DHI
+# runtime (nonroot is 65532) and the local python:slim image (no /etc/passwd entry
+# needed). HOME=/tmp gives yt-dlp/deno a writable cache dir — the app itself writes
+# nothing to disk, and /app/src + /deps are world-readable.
+ENV HOME=/tmp
+USER 65532:65532
+
 # Health check (uses stdlib urllib - no curl/wget in DHI images)
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
   CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
