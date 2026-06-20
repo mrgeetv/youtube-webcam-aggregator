@@ -4,9 +4,9 @@ Turn live webcams from across the web into your own IPTV channel list.
 
 It discovers live webcam streams from multiple sources, merges and de-duplicates
 them into a single categorised **M3U8 playlist**, and serves it over HTTP for any
-IPTV player (TiViMate, VLC, smart TVs, …). Streams are resolved **on demand** when
-you press play, so the playlist never goes stale and the box does almost no work
-until you actually watch something.
+IPTV player (TiViMate, VLC, smart TVs, and similar). Streams are resolved **on
+demand** when a channel is opened, so the playlist stays current and the server
+only does work when a stream is played.
 
 ## Sources
 
@@ -24,17 +24,18 @@ The same camera found on more than one source is merged into a single channel.
   dropped, survivors are de-duplicated, mapped to a unified category, and written
   into a playlist of stable internal URLs.
 - **On-demand serving**: when a player opens a channel, the container resolves the
-  real stream there and then and proxies the HLS manifest — refreshing expiring
-  tokens transparently so long sessions don't die. Video segments stream **directly**
-  from the source CDN; only the tiny manifest passes through the container.
+  stream on request and proxies the HLS manifest, refreshing expiring tokens
+  transparently so long sessions keep playing. Video segments stream **directly**
+  from the source CDN; only the small manifest passes through the container.
 
 ## Quick start
 
 ### Prerequisites
 
-- A [YouTube Data API v3 key](https://console.cloud.google.com/apis/credentials)
-  (free with a Google account)
-- Docker + Docker Compose
+- A YouTube Data API v3 key (free with a Google account). In the
+  [Google Cloud Console](https://console.cloud.google.com/apis/credentials): create
+  a project, enable *YouTube Data API v3*, then create an API key.
+- Docker and Docker Compose installed.
 
 ### Run
 
@@ -56,7 +57,7 @@ It's a standard M3U8 playlist, so:
    out `/stream/<id>` URLs that must be reachable by the player.
 2. In **TiViMate**: *Settings → Playlists → Add playlist → Enter URL* → paste
    `https://<your-address>/playlist.m3u8` → *Next*. Channels load, grouped by category.
-3. Press play on a channel — the stream is resolved on demand and starts.
+3. Open a channel — the stream is resolved on demand and begins playing.
 
 Notes:
 
@@ -68,11 +69,12 @@ Notes:
 
 ## Exposing it
 
-The app is **exposure-agnostic** — it just serves HTTP and builds links from
-`PUBLIC_BASE_URL`. Put whatever you like in front (reverse proxy, Tailscale, plain
-LAN port). The only requirement: the front door must forward **both**
-`/playlist.m3u8` **and** `/stream/*` to the container, and `PUBLIC_BASE_URL` must be
-the address clients actually reach (e.g. `https://cams.example.com`).
+The application is **exposure-agnostic**: it serves HTTP and builds links from
+`PUBLIC_BASE_URL`. Any reverse proxy, tunnel (such as Tailscale), or direct port
+mapping can sit in front. The only requirement is that the front door forwards
+**both** `/playlist.m3u8` **and** `/stream/*` to the container, and that
+`PUBLIC_BASE_URL` is set to the address clients actually reach
+(for example `https://cams.example.com`).
 
 ## Endpoints
 
