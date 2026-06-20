@@ -108,6 +108,25 @@ All via environment variables (see `.env.example`):
 > ~2000-cam catalogue). The build is the high-water mark; lower `SCRAPE_WORKERS` to
 > cap that peak. Live memory is on `/health` (`rss_mb`).
 
+## Upgrading from v1
+
+v2 is a ground-up rewrite and a **breaking change**. Images are tagged `:latest`,
+`:v<version>`, and `:v<major>` — so a pinned `:v1` keeps getting v1.x untouched, but
+if you track `:latest` you'll move to v2. To migrate your existing config:
+
+- **Set `PUBLIC_BASE_URL`** to the address your player actually reaches (see
+  *Exposing it*). v1 didn't need it; v2 builds the `/stream/<id>` URLs from it, so
+  leaving it unset points the playlist at `localhost` and nothing plays.
+- **Renamed:** `UPDATE_INTERVAL_HOURS` → `CATALOGUE_INTERVAL_HOURS`.
+- **Removed (silently ignored if still set):** `EXCLUDED_CATEGORIES`,
+  `MAX_VIDEOS_PER_CYCLE`, `CONCURRENT_EXTRACTIONS`.
+- **Unchanged:** `YOUTUBE_API_KEY`, `SEARCH_QUERY`, `LOG_LEVEL`, and the `23457:8000`
+  port mapping.
+
+The catalogue is now multi-source (YouTube + worldcams.tv + cxtvlive.com) and streams
+resolve on demand, so expect a different, larger channel list. To stay on v1, pin the
+image to a `:v1` tag instead of `:latest`.
+
 ## Development
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for local setup, the test suite, and the
