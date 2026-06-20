@@ -47,7 +47,9 @@ Configure these in your `.env` file or pass directly to docker-compose:
 | `YOUTUBE_API_KEY` | (required) | YouTube Data API v3 key |
 | `PUBLIC_BASE_URL` | `http://localhost:8000` | Base URL used in playlist and manifest links |
 | `CATALOGUE_INTERVAL_HOURS` | `6` | Hours between catalogue refresh cycles |
+| `SEARCH_QUERY` | built-in webcam query | YouTube search terms (`\|`=OR, space=AND, `-`=exclude) |
 | `LOG_LEVEL` | `INFO` | Logging verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+| `PORT` | `8000` | HTTP port inside the container |
 
 ### Using the Run Script
 
@@ -115,6 +117,23 @@ To run hooks manually:
 pre-commit run --all-files
 ```
 
+## Testing
+
+The test suite is **fully offline** (no network or API key needed). Create a
+virtualenv with both requirement files, then run pytest:
+
+```bash
+python -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt
+pytest                                                      # run the suite
+pytest --cov=webcam_aggregator --cov-report=term-missing    # with coverage
+```
+
+The same `pytest` + coverage floor runs as a pre-commit hook (when `src/`, `tests/`,
+or `requirements*.txt` change) and in CI, so a failing test blocks the commit and
+the merge. Test files are named `*_test.py` (enforced by the `name-tests-test` hook).
+
 ## Project Structure
 
 ```text
@@ -131,7 +150,8 @@ youtube-webcam-aggregator/
 │       ├── categories.py       # Category taxonomy mapping
 │       ├── catalogue.py        # Catalogue builder and liveness validation
 │       ├── cache.py            # Resolve cache (TTL, LRU, negative caching)
-│       ├── serving.py          # HTTP server (playlist, health, manifest proxy)
+│       ├── serving.py          # Serving logic (playlist render, manifest/segment proxy)
+│       ├── signing.py          # HMAC signing of proxied manifest/segment URLs
 │       ├── extractors/         # Stream URL extractors
 │       │   ├── ytdlp.py        # yt-dlp extractor
 │       │   ├── direct_hls.py   # Direct HLS link extractor
@@ -173,10 +193,12 @@ LOG_LEVEL=DEBUG
 
 Available levels: `DEBUG`, `INFO`, `WARNING`, `ERROR`
 
-### Memory Tracking
+### Catalogue & resolve logging
 
-When `LOG_LEVEL=DEBUG`, memory usage is logged at the start and end of each
-catalogue refresh cycle. This helps identify memory leaks from yt-dlp.
+At `INFO`, each catalogue rebuild logs per-source `kept / discovered` counts and any
+source collapse (empty-guard). At `DEBUG`, it also logs dropped/failed resolves and
+liveness-probe failures. Live process memory (`rss_mb`) and per-source counts are
+exposed on the `/health` endpoint.
 
 ### Viewing Debug Logs
 

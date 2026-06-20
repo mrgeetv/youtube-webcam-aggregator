@@ -1,4 +1,4 @@
-# Project: YouTube Live Webcam Aggregator
+# Project: Live Webcam Aggregator (multi-source, v2)
 
 > **Note**: CLAUDE.md is a symlink to this file. Edit AGENTS.md only.
 
@@ -12,13 +12,20 @@ The app is two phases, decoupled by a catalogue snapshot:
 
 1. **Catalogue build** (`catalogue.py`, every `CATALOGUE_INTERVAL_HOURS`): each
    `Source.discover()` yields `Candidate`s → liveness filter (YouTube via the Data
-   API batch; everything else via a resolve-probe) → per-source empty-guard (keeps
-   the last good set if a source collapses ≥50%, needs 2 bad cycles to accept) →
-   cross-source `dedupe()` (per-field merge) → `CatalogueEntry`s with a stable id.
+   API batch; everything else via a **fetch-verified probe** — `make_is_alive`
+   actually fetches the HLS manifest and drops dead/404 and DASH cams) → per-source
+   empty-guard (keeps the last good set if a source collapses ≥50%, needs 2 bad
+   cycles to accept) → cross-source `dedupe()` (per-field merge) → YouTube cams get
+   their category from the Data API; scraped titles get location appended
+   (`with_location`) → `CatalogueEntry`s with a stable id.
 2. **On-demand serve** (`serving.py` + `app.py` handler): the playlist holds stable
    `/stream/<id>` URLs. On play, `ResolveCache` resolves the upstream via the
-   `Registry`→`Extractor`, and the HLS manifest is proxied — child manifests are
-   rewritten back through `/stream/<id>/m?u=…&sig=…`; segments go direct to the CDN.
+   `Registry`→`Extractor`, and the HLS manifest is proxied — child manifests rewritten
+   through `/stream/<id>/m?u=…&sig=…`. Segments go **direct to the CDN by default**,
+   with two per-host exceptions (their tokens are IP-bound to the fetcher):
+   `_DIRECT_PLAYBACK_HOSTS` (pixelcaster) get a **302 passthrough** so the player
+   fetches the whole chain itself; `_PROXY_SEGMENT_HOSTS` (balticlivecam) get their
+   **segments relayed** through `/stream/<id>/s?u=…&sig=…`.
 
 **`build_app()` in `app.py` is the wiring seam.** To extend:
 
@@ -29,10 +36,13 @@ The app is two phases, decoupled by a catalogue snapshot:
   `hls:<normalised>` for direct m3u8, `None` = never merged).
 - **Add an extractor** — implement the `Extractor` protocol (`extractors/base.py`):
   `resolve(target_url) -> Resolved(url, stream_type, ttl_seconds)`. Add it to the
-  `extractors` dict in `build_app` AND a predicate to `build_registry`. Startup
-  validation raises if a rule names an extractor that isn't in the dict.
-- **Category mapping** lives in `categories.py` (`_MAP`); native YouTube categories
-  pass through, everything else maps to the unified taxonomy or "Other".
+  `extractors` dict in `build_app` AND a predicate to `build_registry` (startup
+  validation raises if a rule names an extractor not in the dict). If the CDN's
+  tokens are IP-bound, ALSO add its host to `_DIRECT_PLAYBACK_HOSTS` (passthrough)
+  or `_PROXY_SEGMENT_HOSTS` (segment relay) in `serving.py`, or segments will 403.
+- **Category mapping** lives in `categories.py` (`_MAP`); YouTube categories come
+  from the Data API (`videos.list` categoryId) and pass through, everything else
+  maps to the unified taxonomy or "Other".
 
 **Hard-won lessons (don't relearn these):**
 
@@ -44,19 +54,26 @@ The app is two phases, decoupled by a catalogue snapshot:
   patches deno's ELF interpreter so it runs on the hardened Alpine runtime — leave it.
 - Liveness is a **build-time** probe (the playlist must not list dead cams); the
   serve-time resolve is separate and fresh (tokens expire). Don't merge them.
+- yt-dlp is forced to an **HLS** format (`-f b[protocol*=m3u8]`) — some live streams
+  default to DASH (`.mpd`) which the HLS proxy can't serve; `serve_stream` rejects
+  any non-`#EXTM3U` body (so DASH-only cams are dropped, not served broken).
 
 **Security model:** every outbound fetch goes through `fetch.is_safe_url` (rejects
-non-http(s) and private/loopback/link-local IPs) and an 8 MB cap; proxied `/m` URLs
-are HMAC-signed (`signing.py`) so only server-emitted URLs are fetched. **Known
-residual:** `is_safe_url` validates the original URL but the HTTP libs follow
-redirects and re-resolve DNS unchecked (redirect-following / DNS-rebinding SSRF) —
-the durable fix is connection-level IP pinning; until then, run it behind your own
-network controls.
+non-http(s) and private/loopback/link-local IPs), an 8 MB cap, and **per-hop redirect
+re-validation** (in both the `requests` `Fetcher` and the `urllib` `_OPENER`); proxied
+`/m` and `/s` URLs are HMAC-signed (`signing.py`) so only server-emitted URLs are
+fetched. **Known residuals** (mitigate by running behind your own network controls):
+(1) **DNS-rebinding TOCTOU** — `is_safe_url` resolves, then the HTTP lib re-resolves
+at connect; durable fix = connection-level IP pinning. (2) **egress-proxy surface** —
+the proxy will sign + fetch any *public* host that appears in an upstream manifest;
+durable fix = a CDN-host allowlist on the rewritten `/m`/`/s` URLs.
 
-**Tests:** files are `*_test.py` (the `name-tests-test` hook rejects `test_*.py`);
-real-endpoint tests are marked `@pytest.mark.live` and excluded by default
-(`pytest.ini`). The gate is `pre-commit` (which now runs `pytest` + a coverage
-floor as a hook) plus the same checks in CI — not ruff/mypy.
+**Tests:** files are `*_test.py` (the `name-tests-test` hook rejects `test_*.py`).
+The suite is **fully offline** — no real-endpoint/live tests (sources, resolvers,
+and the HTTP handler are exercised with injected fakes + real sockets on port 0).
+The gate is `pre-commit` (which runs `pytest` + a coverage floor as a `files:`-gated
+hook) plus the same checks in CI — not ruff/mypy. The `pytest` hook calls `pytest`
+directly, so the dev venv must be on `PATH` when committing.
 
 ## Branching Workflow
 

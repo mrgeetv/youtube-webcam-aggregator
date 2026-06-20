@@ -25,8 +25,10 @@ The same camera found on more than one source is merged into a single channel.
   into a playlist of stable internal URLs.
 - **On-demand serving**: when a player opens a channel, the container resolves the
   stream on request and proxies the HLS manifest, refreshing expiring tokens
-  transparently so long sessions keep playing. Video segments stream **directly**
-  from the source CDN; only the small manifest passes through the container.
+  transparently so long sessions keep playing. For most cams the video segments
+  stream **directly** from the source CDN (only the small manifest passes through the
+  box); a few sources whose streams are tied to the fetcher are handled specially
+  (passthrough or relayed) so they still play.
 
 ## Quick start
 
@@ -46,7 +48,9 @@ cp .env.example .env          # then edit .env and set YOUTUBE_API_KEY
 docker compose up -d
 ```
 
-The playlist is then available at `http://localhost:23457/playlist.m3u8`.
+The playlist is then available at `http://localhost:23457/playlist.m3u8`. The first
+catalogue build takes a few minutes (discovery + liveness checks); until it's ready,
+`/playlist.m3u8` returns `503`.
 
 ## Adding it to TiViMate (or any IPTV player)
 
