@@ -154,7 +154,17 @@ Always use modern bash syntax:
 - Quote all variable expansions: `"$var"`
 - Use `#!/bin/bash` shebang
 
-## CLAUDE.md Documentation Rules
+## Documentation Rules
+
+**Keep the docs in lockstep with the code — this is part of the change, not a
+follow-up.** Whenever a change alters how the app actually works (architecture, the
+catalogue→serve flow, sources/extractors, config or env vars, serving/CDN behaviour,
+the security model, build/CI, or the "hard-won lessons"), update **`AGENTS.md` in the
+same change** — it is the agent-facing source of truth, so a stale entry silently
+misleads the next agent or contributor. Also update `README.md` (users),
+`DEVELOPMENT.md` (contributors), and `.env.example` wherever they document the changed
+behaviour. If a change touches something a doc covers and the doc isn't updated, the
+change isn't finished.
 
 When updating this file:
 
