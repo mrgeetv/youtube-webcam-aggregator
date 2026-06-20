@@ -62,14 +62,15 @@ def _predisc_key(target: str) -> str | None:
 def location_from_url(page_url: str) -> str:
     """Geographic hint from a scraped cam URL path.
 
-    worldcams /<country>/<place>/<name> -> "Place, Country"; /<country>/<name> ->
-    "Country". cxtvlive /live-camera/<slug> -> "Slug".
+    worldcams /<country>/<place>/<name> and /<country>/<slug> both use the 2nd path
+    segment as the distinguisher -> "<2nd>, <Country>". cxtvlive /live-camera/<slug>
+    -> "Slug".
     """
     path = urlsplit(page_url).path.strip("/")
     pretty = [
         s.replace("-", " ").title() for s in path.split("/") if s and s != "live-camera"
     ]
-    if len(pretty) >= 3:
+    if len(pretty) >= 2:
         return f"{pretty[1]}, {pretty[0]}"
     if pretty:
         return pretty[0]

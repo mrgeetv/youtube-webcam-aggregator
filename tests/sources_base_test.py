@@ -8,7 +8,11 @@ from webcam_aggregator.sources.base import (
 def test_location_from_url():
     base = "https://worldcams.tv"
     assert location_from_url(f"{base}/italy/venice/rialto-bridge") == "Venice, Italy"
-    assert location_from_url(f"{base}/barbados/barbados-beaches") == "Barbados"
+    # 2-segment URLs use the 2nd (distinguishing) segment, not just the country
+    assert (
+        location_from_url(f"{base}/barbados/barbados-beaches")
+        == "Barbados Beaches, Barbados"
+    )
     assert (
         location_from_url("https://www.cxtvlive.com/live-camera/yosemite-falls")
         == "Yosemite Falls"
