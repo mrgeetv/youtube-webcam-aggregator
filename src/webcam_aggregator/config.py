@@ -16,6 +16,14 @@ _DEFAULT_SEARCH_QUERY = (
 log = logging.getLogger("webcam-aggregator.config")
 _VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 
+# v1 env vars that v2 ignores — warn so migrators aren't caught out by silent no-ops.
+_LEGACY_VARS: dict[str, str | None] = {
+    "UPDATE_INTERVAL_HOURS": "CATALOGUE_INTERVAL_HOURS",
+    "EXCLUDED_CATEGORIES": "EXCLUDE_CATEGORIES",
+    "MAX_VIDEOS_PER_CYCLE": None,
+    "CONCURRENT_EXTRACTIONS": None,
+}
+
 
 @dataclass(frozen=True)
 class Config:
@@ -62,6 +70,18 @@ def _warn_on_suspect_config(cfg: Config) -> None:
         )
 
 
+def _warn_legacy_env(env: dict[str, str]) -> None:
+    for old, new in _LEGACY_VARS.items():
+        if not env.get(old):
+            continue
+        if new:
+            log.warning(
+                "%s is a v1 setting, ignored in v2 — did you mean %s?", old, new
+            )
+        else:
+            log.warning("%s is a v1 setting, ignored in v2 (removed)", old)
+
+
 def load(env: dict[str, str] | None = None) -> Config:
     e = env if env is not None else dict(os.environ)
     key = e.get("YOUTUBE_API_KEY", "").strip()
@@ -77,4 +97,5 @@ def load(env: dict[str, str] | None = None) -> Config:
         exclude_categories=_csv_set(e.get("EXCLUDE_CATEGORIES", "")),
     )
     _warn_on_suspect_config(cfg)
+    _warn_legacy_env(e)
     return cfg
