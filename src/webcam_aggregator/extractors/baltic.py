@@ -6,8 +6,8 @@ from collections.abc import Callable
 
 from .base import Resolved
 
-# Verified live 2026-06-20: balticlivecam is a WordPress site. The embed page carries the
-# numeric camera id in `var data = { action: 'auth_token', id: <N>, embed: 1 }`. POSTing
+# balticlivecam is a WordPress site. The embed page carries the numeric camera id in
+# `var data = { action: 'auth_token', id: <N>, embed: 1 }`. POSTing
 # action=auth_token&id=<N>&embed=1 to admin-ajax.php (with an XHR Referer header) returns an
 # HTML player fragment containing the tokenised m3u8 (edge*.balticlivecam.com/...?token=h:<epoch_ms>).
 _AJAX = "https://balticlivecam.com/wp-admin/admin-ajax.php"
