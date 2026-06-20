@@ -32,7 +32,7 @@ The app is two phases, decoupled by a catalogue snapshot:
   `extractors` dict in `build_app` AND a predicate to `build_registry`. Startup
   validation raises if a rule names an extractor that isn't in the dict.
 - **Category mapping** lives in `categories.py` (`_MAP`); native YouTube categories
-  pass through, everything else maps to the unified taxonomy or "Uncategorised".
+  pass through, everything else maps to the unified taxonomy or "Other".
 
 **Hard-won lessons (don't relearn these):**
 

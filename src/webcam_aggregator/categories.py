@@ -23,6 +23,7 @@ _MAP: dict[str, str] = {
     "Monuments": "Landmarks",
     "Religion": "Religion",
     "Churches": "Religion",
+    "Vatican": "Religion",
     "Airports": "Airports",
     "Traffic": "Traffic",
     "Autos & Vehicles": "Traffic",
@@ -52,9 +53,9 @@ _NATIVE_YT: set[str] = {
 
 def map_category(raw: str | None) -> str:
     if not raw:
-        return "Uncategorised"
+        return "Other"
     if raw in _MAP:
         return _MAP[raw]
     if raw in _NATIVE_YT:
         return raw
-    return "Uncategorised"
+    return "Other"
