@@ -9,7 +9,6 @@ from webcam_aggregator.catalogue import (
 )
 from webcam_aggregator.models import Candidate
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from webcam_aggregator.app import origin_of
 
-
 # ---------------------------------------------------------------------------
 # origin_of helper — must return the scheme+host with trailing slash
 # ---------------------------------------------------------------------------

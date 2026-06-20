@@ -12,7 +12,6 @@ from webcam_aggregator.catalogue import build_catalogue
 from webcam_aggregator.extractors.base import Resolved
 from webcam_aggregator.models import Candidate
 
-
 # ---------------------------------------------------------------------------
 # Fake source
 # ---------------------------------------------------------------------------
