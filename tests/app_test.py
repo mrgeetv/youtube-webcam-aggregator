@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from webcam_aggregator.app import origin_of
 
 # ---------------------------------------------------------------------------
@@ -87,3 +89,32 @@ def test_is_alive_fetch_verifies_hls() -> None:
     assert make_is_alive(resolve, lambda u: "#EXTM3U\nseg.ts\n")(cand) is True
     assert make_is_alive(resolve, lambda u: None)(cand) is False  # dead/404
     assert make_is_alive(resolve, lambda u: "<?xml?><MPD/>")(cand) is False  # DASH
+
+
+def test_build_app_starts_without_youtube_when_client_init_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed YouTube client init must degrade gracefully (scrapers still build),
+    not crash startup."""
+    import googleapiclient.discovery
+
+    import webcam_aggregator.app as _app
+    from webcam_aggregator.config import Config
+
+    def _boom(*_a: Any, **_k: Any) -> Any:
+        raise RuntimeError("no creds")
+
+    monkeypatch.setattr(googleapiclient.discovery, "build", _boom)
+
+    cfg = Config(
+        youtube_api_key="dummy",
+        public_base_url="http://localhost",
+        catalogue_interval_hours=6,
+        search_query="q",
+        log_level="INFO",
+        port=8000,
+    )
+    store, _cache, rebuild, source_counts = _app.build_app(cfg)
+    assert store is not None
+    assert callable(rebuild)
+    assert callable(source_counts)
