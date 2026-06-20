@@ -54,7 +54,7 @@ jobs:
           tags: ${{ inputs.tags }}
           labels: |
             org.opencontainers.image.title=${{ github.repository }}
-            org.opencontainers.image.description=YouTube Live Webcam Aggregator
+            org.opencontainers.image.description=Multi-source live webcam aggregator
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha
