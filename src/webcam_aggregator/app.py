@@ -14,7 +14,7 @@ import psutil
 
 from . import config
 from .cache import ResolveCache
-from .catalogue import _Hist, build_catalogue  # pyright: ignore[reportPrivateUsage]
+from .catalogue import Hist, build_catalogue
 from .extractors.base import Resolved
 from .extractors.baltic import BalticResolver
 from .extractors.direct_hls import DirectHls
@@ -179,7 +179,7 @@ def make_handler(
             self.wfile.write(body)
 
         @override
-        def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
+        def log_message(self, format: str, *args: Any) -> None:
             log.debug(format, *args)
 
     return Handler
@@ -211,7 +211,7 @@ def build_app(
     cache: ResolveCache = ResolveCache(resolve, clock=time.monotonic)
 
     try:
-        import googleapiclient.discovery  # type: ignore[import-untyped]
+        import googleapiclient.discovery
 
         yt_client = googleapiclient.discovery.build(
             "youtube", "v3", developerKey=cfg.youtube_api_key
@@ -232,7 +232,7 @@ def build_app(
     active_sources: list[Any] = [s for s in sources if s is not None]
 
     store = CatalogueStore()
-    history: dict[str, _Hist] = {}
+    history: dict[str, Hist] = {}
     is_alive = make_is_alive(resolve)
 
     def youtube_live(ids: Any) -> set[str]:

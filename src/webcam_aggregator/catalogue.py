@@ -13,7 +13,7 @@ AGREE_TO_ACCEPT = 2
 
 
 @dataclass
-class _Hist:
+class Hist:
     last_count: int | None = None
     shrink_streak: int = 0
     last_kept: list[Candidate] = field(default_factory=list)
@@ -36,7 +36,7 @@ def build_catalogue(
     *,
     is_alive: Callable[[Candidate], bool],
     youtube_live: Callable[[Iterable[str]], set[str]],
-    history: dict[str, _Hist],
+    history: dict[str, Hist],
 ) -> list[CatalogueEntry]:
     # Per source: liveness-filter + per-source empty guard -> kept candidates.
     # Cross-source dedup runs ONCE at the end so the same cam from two sources collapses.
@@ -57,7 +57,7 @@ def build_catalogue(
 
         kept = [c for c in cands if alive(c)]
 
-        h = history.setdefault(src.name, _Hist())
+        h = history.setdefault(src.name, Hist())
         collapsed = (
             h.last_count is not None
             and h.last_count > 0

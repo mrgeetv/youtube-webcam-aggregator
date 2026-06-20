@@ -4,7 +4,7 @@ from collections.abc import Iterable
 
 from webcam_aggregator.catalogue import (
     AGREE_TO_ACCEPT,
-    _Hist,  # pyright: ignore[reportPrivateUsage]
+    Hist,
     build_catalogue,
 )
 from webcam_aggregator.models import Candidate
@@ -243,8 +243,8 @@ def _make_old_candidates(n: int) -> list[Candidate]:
 def test_empty_guard_reuses_previous_on_first_shrink() -> None:
     """Prior last_kept of 10; build returning 2 kept (>50% drop) reuses old 10."""
     old_kept = _make_old_candidates(10)
-    history: dict[str, _Hist] = {
-        "worldcams": _Hist(last_count=10, shrink_streak=0, last_kept=old_kept)
+    history: dict[str, Hist] = {
+        "worldcams": Hist(last_count=10, shrink_streak=0, last_kept=old_kept)
     }
 
     # Only 2 candidates survive — 80% drop, triggers guard
@@ -273,8 +273,8 @@ def test_empty_guard_accepts_after_agree_to_accept_consecutive_shrinks() -> None
     """After 2 consecutive shrinks the new small baseline is accepted."""
     old_kept = _make_old_candidates(10)
     # Streak already at AGREE_TO_ACCEPT - 1 (one more shrink tips it over)
-    history: dict[str, _Hist] = {
-        "worldcams": _Hist(
+    history: dict[str, Hist] = {
+        "worldcams": Hist(
             last_count=10,
             shrink_streak=AGREE_TO_ACCEPT - 1,
             last_kept=old_kept,
@@ -317,8 +317,8 @@ def test_empty_guard_no_history_promotes_unconditionally() -> None:
 def test_empty_guard_streak_increments_then_resets() -> None:
     """Two consecutive shrinks: first reuses old set; second (AGREE_TO_ACCEPT=2) accepts."""
     old_kept = _make_old_candidates(10)
-    history: dict[str, _Hist] = {
-        "worldcams": _Hist(last_count=10, shrink_streak=0, last_kept=old_kept)
+    history: dict[str, Hist] = {
+        "worldcams": Hist(last_count=10, shrink_streak=0, last_kept=old_kept)
     }
 
     small_cands = [
