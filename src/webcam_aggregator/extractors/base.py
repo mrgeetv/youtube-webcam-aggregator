@@ -12,4 +12,4 @@ class Resolved:
 
 
 class Extractor(Protocol):
-    def resolve(self, target_url: str) -> Resolved: ...  # noqa: E704
+    def resolve(self, target_url: str) -> Resolved: ...
