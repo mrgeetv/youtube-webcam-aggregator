@@ -140,14 +140,23 @@ class CatalogueStore:
 
 def make_is_alive(
     resolve: Callable[[str, str], Resolved],
+    fetch: Callable[[str], str | None],
 ) -> Callable[[Candidate], bool]:
     def is_alive(c: Candidate) -> bool:
         try:
-            resolve("probe", c.target_url)
-            return True
+            r = resolve("probe", c.target_url)
         except Exception as exc:
-            log.debug("liveness probe failed for %s: %s", c.target_url, exc)
+            log.debug("liveness resolve failed for %s: %s", c.target_url, exc)
             return False
+        if r.stream_type != "hls":
+            return True  # mp4/other: trust the resolve
+        # Actually fetch the HLS manifest — DirectHls/ipcamlive resolve without
+        # fetching, so this is what catches offline (404) and DASH streams.
+        manifest = fetch(r.url)
+        if not manifest or "#EXTM3U" not in manifest:
+            log.debug("liveness: dead/non-HLS manifest %s -> %s", c.target_url, r.url)
+            return False
+        return True
 
     return is_alive
 
@@ -333,7 +342,10 @@ def build_app(
 
     store = CatalogueStore()
     history: dict[str, Hist] = {}
-    is_alive = make_is_alive(resolve)
+    # delay=0: liveness verify-fetches hit CDNs (not the scraped sites) and run
+    # concurrently, so politeness spacing isn't needed here.
+    probe_fetcher = Fetcher(delay=0.0, retries=1)
+    is_alive = make_is_alive(resolve, probe_fetcher.get)
 
     def youtube_live(ids: Any) -> set[str]:
         if yt_source is None:

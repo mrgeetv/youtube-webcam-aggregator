@@ -47,3 +47,27 @@ def test_safe_redirect_handler_blocks_private_hosts() -> None:
     assert (
         h.redirect_request(req, None, 302, "msg", {}, "http://169.254.169.254/") is None
     )
+
+
+def test_is_alive_fetch_verifies_hls() -> None:
+    from webcam_aggregator.app import make_is_alive
+    from webcam_aggregator.extractors.base import Resolved
+    from webcam_aggregator.models import Candidate
+
+    def resolve(_id: str, _url: str) -> Resolved:
+        return Resolved(url="https://cdn.x/p.m3u8", stream_type="hls", ttl_seconds=None)
+
+    cand = Candidate(
+        title="x",
+        angle_label=None,
+        angle_key=None,
+        category=None,
+        source="s",
+        source_page_url="https://x/p",
+        target_url="https://x/p.m3u8",
+        hint=None,
+        predisc_key=None,
+    )
+    assert make_is_alive(resolve, lambda u: "#EXTM3U\nseg.ts\n")(cand) is True
+    assert make_is_alive(resolve, lambda u: None)(cand) is False  # dead/404
+    assert make_is_alive(resolve, lambda u: "<?xml?><MPD/>")(cand) is False  # DASH
