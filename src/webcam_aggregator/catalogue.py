@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass, field, replace
 
 from .categories import map_category
 from .dedup import dedupe
@@ -35,11 +35,22 @@ def _to_entry(c: Candidate) -> CatalogueEntry:
     )
 
 
+def _apply_yt_category(c: Candidate, live: Mapping[str, str]) -> Candidate:
+    # YouTube-source cams carry no category until here; fill it from the live lookup.
+    # Scoped to youtube-api so a worldcams/cxtvlive yt-embed keeps its scraped
+    # category; cross-source dedup priority resolves the rest.
+    if c.source == "youtube-api" and c.predisc_key:
+        cat = live.get(c.predisc_key[3:])
+        if cat:
+            return replace(c, category=cat)
+    return c
+
+
 def build_catalogue(
     sources: list[Source],
     *,
     is_alive: Callable[[Candidate], bool],
-    youtube_live: Callable[[Iterable[str]], set[str]],
+    youtube_live: Callable[[Iterable[str]], Mapping[str, str]],
     history: dict[str, Hist],
 ) -> list[CatalogueEntry]:
     # Per source: liveness-filter + per-source empty guard -> kept candidates.
@@ -56,14 +67,18 @@ def build_catalogue(
             for c in cands
             if c.predisc_key and c.predisc_key.startswith("yt:")
         ]
-        live = youtube_live(yt_ids) if yt_ids else set()
+        live: Mapping[str, str] = youtube_live(yt_ids) if yt_ids else {}
 
-        def alive(c: Candidate, _live: set[str] = live) -> bool:
+        def alive(c: Candidate, _live: Mapping[str, str] = live) -> bool:
             if c.predisc_key and c.predisc_key.startswith("yt:"):
                 return c.predisc_key[3:] in _live
             return is_alive(c)
 
-        kept = [c for c, ok in zip(cands, thread_map(alive, cands)) if ok]
+        kept = [
+            _apply_yt_category(c, live)
+            for c, ok in zip(cands, thread_map(alive, cands))
+            if ok
+        ]
         log.info("%s: %d kept / %d discovered", src.name, len(kept), len(cands))
 
         h = history.setdefault(src.name, Hist())

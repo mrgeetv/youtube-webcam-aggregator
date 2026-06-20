@@ -70,7 +70,7 @@ def test_live_ids_filters_offair() -> None:
         "items": [
             {
                 "id": "live1",
-                "snippet": {"liveBroadcastContent": "live"},
+                "snippet": {"liveBroadcastContent": "live", "categoryId": "19"},
                 "liveStreamingDetails": {},
             },
             {
@@ -86,4 +86,5 @@ def test_live_ids_filters_offair() -> None:
         ]
     }
     src = YoutubeApiSource(_FakeClient(videos=[resp]), query="cam")
-    assert src.live_ids(["live1", "ended", "vod"]) == {"live1"}
+    # returns {live_id: category_name}; categoryId 19 → "Travel & Events"
+    assert src.live_ids(["live1", "ended", "vod"]) == {"live1": "Travel & Events"}

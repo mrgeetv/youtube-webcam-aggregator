@@ -57,12 +57,12 @@ def _never_alive(_c: Candidate) -> bool:
     return False
 
 
-def _no_yt_live(_ids: Iterable[str]) -> set[str]:
-    return set()
+def _no_yt_live(_ids: Iterable[str]) -> dict[str, str]:
+    return {}
 
 
-def _all_yt_live(ids: Iterable[str]) -> set[str]:
-    return set(ids)
+def _all_yt_live(ids: Iterable[str]) -> dict[str, str]:
+    return {i: "" for i in ids}
 
 
 # ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ def test_cross_source_dedup_collapses_same_predisc_key() -> None:
     result = build_catalogue(
         [src_yt, src_scraper],
         is_alive=_always_alive,
-        youtube_live=lambda _ids: {"AAA"},
+        youtube_live=lambda _ids: {"AAA": ""},
         history={},
     )
 
@@ -210,8 +210,8 @@ def test_yt_candidate_excluded_when_not_in_live_set() -> None:
     )
     src = _Src("youtube-api", [live_cand, dead_cand])
 
-    def youtube_live(_ids: Iterable[str]) -> set[str]:
-        return {"LIVE001"}
+    def youtube_live(_ids: Iterable[str]) -> dict[str, str]:
+        return {"LIVE001": ""}
 
     result = build_catalogue(
         [src], is_alive=_never_alive, youtube_live=youtube_live, history={}
@@ -219,6 +219,24 @@ def test_yt_candidate_excluded_when_not_in_live_set() -> None:
 
     assert len(result) == 1
     assert result[0].source_page_url == live_cand.source_page_url
+
+
+def test_youtube_category_applied_from_live() -> None:
+    """A youtube-source cam gets its category from the live lookup."""
+    cam = _make_candidate(
+        source="youtube-api",
+        key="yt:LIVE001",
+        page="https://www.youtube.com/watch?v=LIVE001",
+        target="https://www.youtube.com/watch?v=LIVE001",
+    )
+    result = build_catalogue(
+        [_Src("youtube-api", [cam])],
+        is_alive=_always_alive,
+        youtube_live=lambda _ids: {"LIVE001": "Travel & Events"},
+        history={},
+    )
+    assert len(result) == 1
+    assert result[0].category == "Travel & Events"
 
 
 # ---------------------------------------------------------------------------

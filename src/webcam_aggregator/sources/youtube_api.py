@@ -5,6 +5,26 @@ from typing import Any
 
 from ..models import Candidate
 
+# YouTube's stable video-category IDs → names. Names then flow through
+# categories.map_category (mapped to the unified taxonomy or kept as native).
+_YT_CATEGORIES: dict[str, str] = {
+    "1": "Film & Animation",
+    "2": "Autos & Vehicles",
+    "10": "Music",
+    "15": "Pets & Animals",
+    "17": "Sports",
+    "19": "Travel & Events",
+    "20": "Gaming",
+    "22": "People & Blogs",
+    "23": "Comedy",
+    "24": "Entertainment",
+    "25": "News & Politics",
+    "26": "Howto & Style",
+    "27": "Education",
+    "28": "Science & Technology",
+    "29": "Nonprofits & Activism",
+}
+
 
 class YoutubeApiSource:
     name: str = "youtube-api"
@@ -55,9 +75,10 @@ class YoutubeApiSource:
             if not token:
                 break
 
-    def live_ids(self, video_ids: Iterable[str]) -> set[str]:
+    def live_ids(self, video_ids: Iterable[str]) -> dict[str, str]:
+        """Map of currently-live video id -> category name (name may be "")."""
         ids = list(video_ids)
-        live: set[str] = set()
+        live: dict[str, str] = {}
         for i in range(0, len(ids), 50):
             chunk = ids[i : i + 50]
             resp = (
@@ -72,5 +93,5 @@ class YoutubeApiSource:
                     snip.get("liveBroadcastContent") == "live"
                     and "actualEndTime" not in details
                 ):
-                    live.add(it["id"])
+                    live[it["id"]] = _YT_CATEGORIES.get(snip.get("categoryId", ""), "")
         return live

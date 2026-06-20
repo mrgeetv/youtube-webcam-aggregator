@@ -347,9 +347,9 @@ def build_app(
     probe_fetcher = Fetcher(delay=0.0, retries=1)
     is_alive = make_is_alive(resolve, probe_fetcher.get)
 
-    def youtube_live(ids: Any) -> set[str]:
+    def youtube_live(ids: Any) -> dict[str, str]:
         if yt_source is None:
-            return set()
+            return {}
         return yt_source.live_ids(ids)
 
     def source_counts() -> dict[str, int]:
