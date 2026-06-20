@@ -21,7 +21,7 @@ from .extractors.direct_hls import DirectHls
 from .extractors.ipcamlive import IpcamliveResolver
 from .extractors.metatag import MetaTagExtractor
 from .extractors.ytdlp import YtDlpExtractor
-from .fetch import Fetcher
+from .fetch import MAX_BYTES, Fetcher, is_safe_url
 from .models import Candidate, CatalogueEntry
 from .registry import Registry
 from .serving import render_playlist, serve_child_manifest, serve_stream
@@ -31,18 +31,38 @@ _HLS_CT = "application/vnd.apple.mpegurl"
 _UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36"
 
 
+def origin_of(url: str) -> str:
+    p = urllib.parse.urlsplit(url)
+    return f"{p.scheme}://{p.hostname}/"
+
+
 def _http_get(url: str) -> str:
+    if not is_safe_url(url):
+        raise ValueError(f"unsafe url: {url}")
     req = urllib.request.Request(url, headers={"User-Agent": _UA})
     with urllib.request.urlopen(req, timeout=20) as r:
-        return r.read().decode("utf-8", "replace")
+        data = r.read(MAX_BYTES + 1)
+        if len(data) > MAX_BYTES:
+            raise ValueError(f"response too large from {url}")
+        return data.decode("utf-8", "replace")
 
 
 def _http_post(url: str, data: dict[str, str]) -> str:
+    if not is_safe_url(url):
+        raise ValueError(f"unsafe url: {url}")
     body = urllib.parse.urlencode(data).encode()
-    headers = {"User-Agent": _UA, "X-Requested-With": "XMLHttpRequest", "Referer": url}
+    referer = origin_of(url)
+    headers = {
+        "User-Agent": _UA,
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": referer,
+    }
     req = urllib.request.Request(url, data=body, headers=headers)
     with urllib.request.urlopen(req, timeout=20) as r:
-        return r.read().decode("utf-8", "replace")
+        resp_data = r.read(MAX_BYTES + 1)
+        if len(resp_data) > MAX_BYTES:
+            raise ValueError(f"response too large from {url}")
+        return resp_data.decode("utf-8", "replace")
 
 
 def _is_ytdlp(u: str) -> bool:
@@ -134,9 +154,14 @@ def make_handler(
                 if not u_list:
                     self._respond(400, "text/plain", b"missing u= param")
                     return
+                sig_list = qs.get("sig", [])
+                if not sig_list:
+                    self._respond(403, "text/plain", b"bad signature")
+                    return
                 upstream_url = u_list[0]
+                sig = sig_list[0]
                 status, ct, body = serve_child_manifest(
-                    entry_id, upstream_url, fetch=manifest_fetch, base_url=base_url
+                    entry_id, upstream_url, sig, fetch=manifest_fetch, base_url=base_url
                 )
                 self._respond(status, ct, body)
                 return

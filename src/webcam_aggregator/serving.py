@@ -6,6 +6,7 @@ from urllib.parse import quote, urljoin
 
 from .cache import ResolveCache
 from .models import CatalogueEntry
+from .signing import sign, verify
 
 _HLS_CT = "application/vnd.apple.mpegurl"
 _NONCOMMENT = re.compile(r"^(?!#)(\S+)\s*$", re.M)
@@ -29,7 +30,7 @@ def rewrite_manifest(
         ref = m.group(1)
         absolute = urljoin(upstream_url, ref)
         if absolute.split("?", 1)[0].endswith(".m3u8"):
-            return f"{base_url}/stream/{entry_id}/m?u={quote(absolute, safe='')}"
+            return f"{base_url}/stream/{entry_id}/m?u={quote(absolute, safe='')}&sig={sign(absolute)}"
         return absolute
 
     return _NONCOMMENT.sub(repl, text)
@@ -63,10 +64,13 @@ def serve_stream(
 def serve_child_manifest(
     entry_id: str,
     upstream_url: str,
+    sig: str,
     *,
     fetch: Callable[[str], str | None],
     base_url: str,
 ) -> Response:
+    if not verify(upstream_url, sig):
+        return (403, "text/plain", b"bad signature")
     manifest = fetch(upstream_url)
     if manifest is None:
         return (502, "text/plain", b"upstream manifest fetch failed")

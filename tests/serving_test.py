@@ -11,6 +11,7 @@ from webcam_aggregator.serving import (
     serve_stream,
     serve_child_manifest,
 )
+from webcam_aggregator.signing import sign
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -88,8 +89,8 @@ def test_rewrite_manifest_yt_master_variant_lines_become_proxy_urls() -> None:
     out = rewrite_manifest(
         YT_MASTER, upstream_url=YT_UPSTREAM, entry_id=ENTRY_ID, base_url=BASE
     )
-    expected_1 = f"{BASE}/stream/{ENTRY_ID}/m?u={quote(YT_VARIANT_1, safe='')}"
-    expected_2 = f"{BASE}/stream/{ENTRY_ID}/m?u={quote(YT_VARIANT_2, safe='')}"
+    expected_1 = f"{BASE}/stream/{ENTRY_ID}/m?u={quote(YT_VARIANT_1, safe='')}&sig="
+    expected_2 = f"{BASE}/stream/{ENTRY_ID}/m?u={quote(YT_VARIANT_2, safe='')}&sig="
     assert expected_1 in out
     assert expected_2 in out
 
@@ -128,7 +129,7 @@ media_1.ts
 
 def test_rewrite_manifest_wowza_child_m3u8_becomes_proxy_url() -> None:
     absolute_child = "https://cdn.x/cam/chunklist_w1.m3u8"
-    expected = f"{BASE}/stream/{ENTRY_ID}/m?u={quote(absolute_child, safe='')}"
+    expected = f"{BASE}/stream/{ENTRY_ID}/m?u={quote(absolute_child, safe='')}&sig="
     out = rewrite_manifest(
         WOWZA_MEDIA, upstream_url=WOWZA_UPSTREAM, entry_id=ENTRY_ID, base_url=BASE
     )
@@ -206,7 +207,7 @@ def test_serve_stream_hls_returns_200_rewritten_body() -> None:
     assert status == 200
     assert "mpegurl" in ct
     text = body.decode()
-    expected_proxied = f"{BASE}/stream/{ENTRY_ID}/m?u={quote('https://cdn.x/cam/relative_chunk.m3u8', safe='')}"
+    expected_proxied = f"{BASE}/stream/{ENTRY_ID}/m?u={quote('https://cdn.x/cam/relative_chunk.m3u8', safe='')}&sig="
     assert expected_proxied in text
 
 
@@ -233,9 +234,11 @@ def test_serve_stream_mp4_returns_302_with_location() -> None:
 
 
 def test_serve_child_manifest_fetch_failure_returns_502() -> None:
+    url = "https://cdn.x/cam/chunklist.m3u8"
     status, _, _ = serve_child_manifest(
         ENTRY_ID,
-        "https://cdn.x/cam/chunklist.m3u8",
+        url,
+        sign(url),
         fetch=lambda u: None,
         base_url=BASE,
     )
@@ -248,6 +251,7 @@ def test_serve_child_manifest_returns_200_rewritten_body() -> None:
     status, ct, body = serve_child_manifest(
         ENTRY_ID,
         upstream_url,
+        sign(upstream_url),
         fetch=lambda u: media_manifest,
         base_url=BASE,
     )
@@ -257,3 +261,59 @@ def test_serve_child_manifest_returns_200_rewritten_body() -> None:
     # Segment must be absolute direct (not proxied)
     assert "https://cdn.x/cam/seg_001.ts" in text
     assert f"{BASE}/stream/" not in text
+
+
+# ---------------------------------------------------------------------------
+# 6. serve_child_manifest — HMAC signature enforcement
+# ---------------------------------------------------------------------------
+
+
+def test_serve_child_manifest_valid_sig_returns_200() -> None:
+    url = "https://cdn.x/cam/chunklist.m3u8"
+    media_manifest = "#EXTM3U\nseg_001.ts\n"
+    status, ct, _ = serve_child_manifest(
+        ENTRY_ID,
+        url,
+        sign(url),
+        fetch=lambda u: media_manifest,
+        base_url=BASE,
+    )
+    assert status == 200
+    assert "mpegurl" in ct
+
+
+def test_serve_child_manifest_bad_sig_returns_403() -> None:
+    url = "https://cdn.x/cam/chunklist.m3u8"
+    status, _, body = serve_child_manifest(
+        ENTRY_ID,
+        url,
+        "0" * 32,  # wrong sig
+        fetch=lambda u: "#EXTM3U\n",
+        base_url=BASE,
+    )
+    assert status == 403
+    assert b"bad signature" in body
+
+
+def test_serve_child_manifest_empty_sig_returns_403() -> None:
+    url = "https://cdn.x/cam/chunklist.m3u8"
+    status, _, body = serve_child_manifest(
+        ENTRY_ID,
+        url,
+        "",  # missing/empty sig
+        fetch=lambda u: "#EXTM3U\n",
+        base_url=BASE,
+    )
+    assert status == 403
+    assert b"bad signature" in body
+
+
+def test_rewrite_manifest_output_contains_sig_param() -> None:
+    """rewrite_manifest must append &sig= to every child-manifest proxy URL."""
+    out = rewrite_manifest(
+        YT_MASTER, upstream_url=YT_UPSTREAM, entry_id=ENTRY_ID, base_url=BASE
+    )
+    # Every non-comment, non-empty line must contain &sig=
+    lines = [ln for ln in out.splitlines() if ln and not ln.startswith("#")]
+    for line in lines:
+        assert "&sig=" in line, f"missing &sig= in: {line!r}"
