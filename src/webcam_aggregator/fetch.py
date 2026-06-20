@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import time
+from typing import Protocol
 
 import requests
 
 _UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+
+
+class FetcherProtocol(Protocol):
+    def get(self, url: str, timeout: float = ..., /) -> str | None: ...
 
 
 class Fetcher:
