@@ -4,7 +4,7 @@ import re
 from collections.abc import Iterator
 from dataclasses import replace
 
-from ..fetch import FetcherProtocol
+from ..fetch import FetcherProtocol, thread_map
 from ..models import Candidate
 from .base import extract_candidates
 
@@ -25,9 +25,9 @@ class CxtvliveSource:
         return list(dict.fromkeys(_SLUG.findall(sm)))
 
     def discover(self) -> Iterator[Candidate]:
-        for slug in self._slugs():
-            url = "https://www.cxtvlive.com/live-camera/" + slug
-            html = self._fetch.get(url)
+        slugs = self._slugs()
+        urls = ["https://www.cxtvlive.com/live-camera/" + s for s in slugs]
+        for slug, url, html in zip(slugs, urls, thread_map(self._fetch.get, urls)):
             if not html:
                 continue
             tm = _TITLE.search(html)

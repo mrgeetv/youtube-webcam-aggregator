@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 from .categories import map_category
 from .dedup import dedupe
+from .fetch import thread_map
 from .models import Candidate, CatalogueEntry, stable_id
 from .sources.base import Source
 
@@ -62,7 +63,7 @@ def build_catalogue(
                 return c.predisc_key[3:] in _live
             return is_alive(c)
 
-        kept = [c for c in cands if alive(c)]
+        kept = [c for c, ok in zip(cands, thread_map(alive, cands)) if ok]
         log.info("%s: %d kept / %d discovered", src.name, len(kept), len(cands))
 
         h = history.setdefault(src.name, Hist())

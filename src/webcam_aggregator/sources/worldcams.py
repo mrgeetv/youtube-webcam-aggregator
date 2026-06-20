@@ -4,10 +4,11 @@ import re
 from collections.abc import Iterator
 from dataclasses import replace
 
-from ..fetch import FetcherProtocol
+from ..fetch import FetcherProtocol, thread_map
 from ..models import Candidate
 from .base import extract_candidates
 
+_MAX_LIST_PAGES = 80
 _LINKS = re.compile(r'class="cam-promo__title"[^>]*>\s*<a href="([^"]+)"')
 _TITLE = re.compile(r"<h1[^>]*>([^<]{1,120})</h1>")
 _CATEGORY = re.compile(r'Category:\s*(?:&nbsp;)?<a href="/([^/]+)/">([^<]+)</a>')
@@ -20,22 +21,21 @@ class WorldcamsSource:
     def __init__(self, fetch: FetcherProtocol) -> None:
         self._fetch = fetch
 
-    def _camera_urls(self) -> Iterator[str]:
-        page = 1
-        while page <= 80:
+    def _camera_urls(self) -> list[str]:
+        # List pages stay sequential with early-stop (politest, only ~tens of them);
+        # the bulk — the per-camera detail pages — is fetched concurrently in discover.
+        urls: list[str] = []
+        for page in range(1, _MAX_LIST_PAGES + 1):
             html = self._fetch.get(f"https://worldcams.tv/list/?page={page}")
-            if not html:
-                break
-            links = list(dict.fromkeys(_LINKS.findall(html)))
+            links = list(dict.fromkeys(_LINKS.findall(html))) if html else []
             if not links:
                 break
-            for link in links:
-                yield "https://worldcams.tv" + link
-            page += 1
+            urls.extend("https://worldcams.tv" + link for link in links)
+        return list(dict.fromkeys(urls))
 
     def discover(self) -> Iterator[Candidate]:
-        for url in self._camera_urls():
-            html = self._fetch.get(url)
+        urls = self._camera_urls()
+        for url, html in zip(urls, thread_map(self._fetch.get, urls)):
             if not html:
                 continue
             tm = _TITLE.search(html)

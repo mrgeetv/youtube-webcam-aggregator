@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import ipaddress
+import os
 import socket
 import time
-from typing import Protocol
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from typing import Protocol, TypeVar
 from urllib.parse import urljoin, urlsplit
 
 import requests
@@ -12,6 +15,23 @@ UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chr
 
 MAX_BYTES = 8 * 1024 * 1024  # 8 MB ceiling for any fetched document
 _MAX_REDIRECTS = 5
+
+# Concurrency for scraping/liveness. The work is I/O-bound (network waits), so the
+# ceiling is politeness to the target host, not local cores — capped accordingly.
+SCRAPE_WORKERS = min(16, (os.cpu_count() or 2) * 4)
+
+_T = TypeVar("_T")
+_R = TypeVar("_R")
+
+
+def thread_map(
+    fn: Callable[[_T], _R], items: list[_T], *, workers: int = SCRAPE_WORKERS
+) -> list[_R]:
+    """Map fn over items concurrently, preserving order. Empty in → empty out."""
+    if not items:
+        return []
+    with ThreadPoolExecutor(max_workers=max(1, min(workers, len(items)))) as ex:
+        return list(ex.map(fn, items))
 
 
 def is_safe_url(url: str) -> bool:
