@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 import threading
 import time
 import urllib.parse
@@ -114,7 +115,7 @@ def make_resolve(
     def resolve(_entry_id: str, target_url: str) -> Resolved:
         name = registry.match(target_url, resolve_redirect=lambda u: u)
         if name is None:
-            log.warning("no extractor matched target %s", target_url)
+            log.debug("no extractor matched target %s", target_url)
             raise ValueError(f"no extractor for {target_url}")
         return extractors[name].resolve(target_url)
 
@@ -240,10 +241,19 @@ def make_handler(
     return Handler
 
 
+class _QuietHTTPServer(ThreadingHTTPServer):
+    @override
+    def handle_error(self, request: Any, client_address: Any) -> None:
+        # A player closing a stream mid-write is normal, not an error to dump.
+        if isinstance(sys.exc_info()[1], (ConnectionResetError, BrokenPipeError)):
+            return
+        super().handle_error(request, client_address)
+
+
 def run_http_server(
     handler_cls: type[BaseHTTPRequestHandler], port: int = 8000
 ) -> None:
-    server = ThreadingHTTPServer(("", port), handler_cls)
+    server = _QuietHTTPServer(("", port), handler_cls)
     t = threading.Thread(target=server.serve_forever, daemon=True)
     t.start()
     log.info("HTTP server listening on port %d", port)

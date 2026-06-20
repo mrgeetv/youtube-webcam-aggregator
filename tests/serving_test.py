@@ -228,6 +228,28 @@ def test_serve_stream_mp4_returns_302_with_location() -> None:
     assert body == b""
 
 
+def test_serve_stream_pixelcaster_hls_passthrough_302_no_proxy() -> None:
+    # IP-bound session host: hand the player the original URL, never proxy/fetch it
+    px_url = "https://cs9.pixelcaster.com/live/cam.stream/playlist.m3u8"
+    resolved = Resolved(url=px_url, stream_type="hls", ttl_seconds=None)
+    cache = _make_cache(resolved)
+    entry = _entry()
+
+    def _fail_fetch(_u: str) -> str | None:
+        raise AssertionError("a direct-playback host must not be proxied/fetched")
+
+    status, location, body = serve_stream(
+        ENTRY_ID,
+        catalogue={ENTRY_ID: entry},
+        cache=cache,
+        fetch=_fail_fetch,
+        base_url=BASE,
+    )
+    assert status == 302
+    assert location == px_url
+    assert body == b""
+
+
 # ---------------------------------------------------------------------------
 # 5. serve_child_manifest
 # ---------------------------------------------------------------------------

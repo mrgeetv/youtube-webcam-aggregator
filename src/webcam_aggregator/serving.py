@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Mapping
-from urllib.parse import quote, urljoin
+from urllib.parse import quote, urljoin, urlsplit
 
 from .cache import ResolveCache
 from .models import CatalogueEntry
@@ -10,6 +10,18 @@ from .signing import sign, verify
 
 _HLS_CT = "application/vnd.apple.mpegurl"
 _NONCOMMENT = re.compile(r"^(?!#)(\S+)\s*$", re.M)
+
+# Hosts whose HLS sessions are bound to the IP that fetches the manifest. Proxying
+# the manifest (our IP) while the player fetches segments direct (its IP) makes the
+# upstream 403 the segments. For these we hand the player the original URL and let
+# it fetch the whole chain itself, so manifest + segments share one IP/session.
+_DIRECT_PLAYBACK_HOSTS = ("pixelcaster.com",)
+
+
+def _is_direct_playback(url: str) -> bool:
+    host = urlsplit(url).hostname or ""
+    return any(host == h or host.endswith("." + h) for h in _DIRECT_PLAYBACK_HOSTS)
+
 
 # (status_code, content_type_or_location, body)
 Response = tuple[int, str, bytes]
@@ -52,6 +64,9 @@ def serve_stream(
         return (502, "text/plain", b"resolve failed")
     if resolved.stream_type == "mp4":
         return (302, resolved.url, b"")  # redirect; 2nd field is the Location
+    if _is_direct_playback(resolved.url):
+        # IP-bound session: let the player fetch the whole chain itself (no proxy)
+        return (302, resolved.url, b"")
     manifest = fetch(resolved.url)
     if manifest is None:
         return (502, "text/plain", b"upstream manifest fetch failed")

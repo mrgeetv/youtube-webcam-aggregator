@@ -9,7 +9,10 @@ from .extractors.base import Resolved
 
 TTL_FACTOR = 0.8
 NEGATIVE_TTL = 60.0
-DEFAULT_TTL = 3600.0
+# Fallback when an extractor can't report an expiry (DirectHls/MetaTag/ipcamlive).
+# Kept short: these are often session/token streams whose URLs go stale in minutes,
+# so a stale cached resolve would break playback until it expired.
+DEFAULT_TTL = 600.0
 
 
 @dataclass
