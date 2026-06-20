@@ -10,6 +10,10 @@ __pycache__/
 *$py.class
 *.so
 
+# Local virtualenv (dev only)
+.venv/
+.pytest_cache/
+
 # Docker
 .dockerignore
 
@@ -22,6 +26,11 @@ __pycache__/
 
 # Claude Code local overrides (personal, not shared)
 .claude/settings.local.json
+
+# Working artifacts — local only, NOT committed to the public repo
+docs/specs/
+docs/plans/
+docs/recon/
 
 # Logs
 *.log
