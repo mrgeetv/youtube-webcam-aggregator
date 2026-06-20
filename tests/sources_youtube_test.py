@@ -1,4 +1,7 @@
+import logging
 from typing import Any
+
+import pytest
 
 from webcam_aggregator.sources.youtube_api import YoutubeApiSource
 
@@ -60,9 +63,11 @@ def test_discover_paginates_and_stops() -> None:
     assert [c.predisc_key for c in cands] == ["yt:aaaaaaaaaaa", "yt:bbbbbbbbbbb"]
 
 
-def test_discover_stops_on_quota_error() -> None:
+def test_discover_stops_on_quota_error(caplog: pytest.LogCaptureFixture) -> None:
     src = YoutubeApiSource(_FakeClient(search=[RuntimeError("403 quota")]), query="cam")
-    assert list(src.discover()) == []
+    with caplog.at_level(logging.WARNING, logger="webcam-aggregator.sources.youtube"):
+        assert list(src.discover()) == []
+    assert "youtube search stopped" in caplog.text
 
 
 def test_live_ids_filters_offair() -> None:

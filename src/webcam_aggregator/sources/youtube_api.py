@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable, Iterator
 from typing import Any
 
 from ..models import Candidate
+
+log = logging.getLogger("webcam-aggregator.sources.youtube")
 
 # YouTube's stable video-category IDs → names. Names then flow through
 # categories.map_category (mapped to the unified taxonomy or kept as native).
@@ -55,8 +58,16 @@ class YoutubeApiSource:
                     )
                     .execute()
                 )
-            except Exception:
-                return  # quota/403 or transient error → stop with what we've yielded
+            except Exception as exc:
+                # Log the status only; the request URL carries the API key.
+                status = getattr(getattr(exc, "resp", None), "status", None)
+                log.warning(
+                    "youtube search stopped after %d items (HTTP %s). Likely API "
+                    "quota; raise the quota or narrow SEARCH_QUERY.",
+                    n,
+                    status if status is not None else "?",
+                )
+                return
             for it in resp.get("items", []):
                 vid = it["id"]["videoId"]
                 n += 1
