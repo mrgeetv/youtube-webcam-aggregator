@@ -6,12 +6,11 @@ import time
 from unittest.mock import patch
 
 import pytest
-import requests
 
-from webcam_aggregator import fetch
 from webcam_aggregator.fetch import (
     Fetcher,
-    _PinnedHostAdapter,  # pyright: ignore[reportPrivateUsage]
+    _pin,  # pyright: ignore[reportPrivateUsage]
+    _PinDNS,  # pyright: ignore[reportPrivateUsage]
     _resolve_validated_ip,  # pyright: ignore[reportPrivateUsage]
     resolve_scrape_workers,
 )
@@ -529,97 +528,57 @@ def test_resolve_validated_ip_returns_public(monkeypatch: pytest.MonkeyPatch) ->
     assert _resolve_validated_ip("https://example.com/x") == "93.184.216.34"
 
 
-def test_pinned_adapter_connects_to_ip_keeps_hostname_for_tls() -> None:
-    """The pin seam: TCP target is the validated IP, but SNI + cert hostname
-    matching (server_hostname / assert_hostname) stay bound to the ORIGINAL host."""
-    adapter = _PinnedHostAdapter("cam.example", "203.0.113.7")
-    captured: dict[str, object] = {}
-
-    def fake_connection_from_host(**kwargs: object) -> object:
-        captured.update(kwargs)
-        return object()
-
-    # poolmanager is created in HTTPAdapter.__init__; intercept its factory.
-    adapter.poolmanager.connection_from_host = fake_connection_from_host  # type: ignore[method-assign]
-    req = requests.PreparedRequest()
-    req.prepare(method="GET", url="https://cam.example/playlist.m3u8")
-
-    adapter.get_connection_with_tls_context(req, verify=True)
-
-    # Connect to the pinned IP, not the hostname.
-    assert captured["host"] == "203.0.113.7"
-    assert captured["scheme"] == "https"
-    pool_kwargs = captured["pool_kwargs"]
-    assert isinstance(pool_kwargs, dict)
-    # TLS stays bound to the hostname: SNI + cert hostname match use the host.
-    assert pool_kwargs["server_hostname"] == "cam.example"
-    assert pool_kwargs["assert_hostname"] == "cam.example"
+def test_pin_dns_pins_getaddrinfo_then_clears() -> None:
+    """Inside `with _PinDNS(host, ip)`, getaddrinfo resolves the host to the pinned
+    IP (so the socket dials it); the hostname stays in the URL, so urllib3 still does
+    SNI/Host/cert against it. The pin is cleared on exit. Scheme-agnostic by design."""
+    host = "cam.example"
+    with _PinDNS(host, "203.0.113.7"):
+        infos = socket.getaddrinfo(host, 443)
+        assert any(info[4][0] == "203.0.113.7" for info in infos)
+    assert not getattr(_pin, "map", {})  # pin cleared on exit
 
 
-def test_pinned_adapter_http_pins_ip_without_tls_kwargs() -> None:
-    """For plain http:// the IP is still pinned, but the TLS-only kwargs
-    (server_hostname/assert_hostname) must NOT be set — a plain HTTPConnection
-    rejects them and would raise TypeError at connect time."""
-    adapter = _PinnedHostAdapter("cam.example", "203.0.113.7")
-    captured: dict[str, object] = {}
+class _PinStubResp:
+    is_redirect: bool = False
+    is_permanent_redirect: bool = False
 
-    def fake_connection_from_host(**kwargs: object) -> object:
-        captured.update(kwargs)
-        return object()
+    def raise_for_status(self) -> None: ...
 
-    adapter.poolmanager.connection_from_host = fake_connection_from_host  # type: ignore[method-assign]
-    req = requests.PreparedRequest()
-    req.prepare(method="GET", url="http://cam.example/playlist.m3u8")
+    def iter_content(self, _n: int) -> object:
+        return iter([b"#EXTM3U"])
 
-    adapter.get_connection_with_tls_context(req, verify=True)
-
-    assert captured["host"] == "203.0.113.7"
-    assert captured["scheme"] == "http"
-    pool_kwargs = captured["pool_kwargs"]
-    assert isinstance(pool_kwargs, dict)
-    assert "server_hostname" not in pool_kwargs
-    assert "assert_hostname" not in pool_kwargs
+    def close(self) -> None: ...
 
 
 def test_fetcher_pins_to_validated_ip_not_a_second_lookup(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Rebinding simulation: the resolver returns a PUBLIC IP at validation time;
-    the connection must be made to THAT pinned IP via the adapter, with SNI/Host
-    still the original hostname — never a fresh lookup at connect time."""
+    the connection must be pinned to THAT ip (host kept for SNI/Host) via _PinDNS,
+    never a fresh lookup at connect time."""
     monkeypatch.setattr(
         "webcam_aggregator.fetch.socket.getaddrinfo",
         lambda *_a, **_k: _mock_getaddrinfo("93.184.216.34"),
     )
 
-    seen: dict[str, object] = {}
-    real_init = _PinnedHostAdapter.__init__
+    seen: dict[str, str] = {}
+    real_init = _PinDNS.__init__
 
-    def spy_init(self: _PinnedHostAdapter, host: str, ip: str) -> None:
+    def spy_init(self: _PinDNS, host: str, ip: str) -> None:
         seen["host"] = host
         seen["ip"] = ip
         real_init(self, host, ip)
 
-    monkeypatch.setattr(_PinnedHostAdapter, "__init__", spy_init)
-
-    class _OkResp:
-        is_redirect: bool = False
-        is_permanent_redirect: bool = False
-
-        def raise_for_status(self) -> None: ...
-
-        def iter_content(self, _n: int) -> object:
-            return iter([b"#EXTM3U"])
-
-        def close(self) -> None: ...
-
-    monkeypatch.setattr("requests.Session.get", lambda _self, _url, **_k: _OkResp())
+    monkeypatch.setattr(_PinDNS, "__init__", spy_init)
+    monkeypatch.setattr(
+        "requests.Session.get", lambda _self, _url, **_k: _PinStubResp()
+    )
 
     f = Fetcher(delay=0.0, retries=1)
     assert f.get("https://cam.example/playlist.m3u8") == "#EXTM3U"
-    # The adapter was pinned to the IP chosen at validation, host kept for TLS/Host.
-    assert seen["ip"] == "93.184.216.34"
-    assert seen["host"] == "cam.example"
+    # Pinned to the IP chosen at validation; host kept for TLS/Host.
+    assert seen == {"host": "cam.example", "ip": "93.184.216.34"}
 
 
 def test_fetcher_get_blocks_private_resolution(
@@ -752,21 +711,10 @@ def test_fetcher_tls_verified_against_hostname_while_connecting_to_ip(
         # while leaving the pin + TLS path fully real.
         monkeypatch.setattr("webcam_aggregator.fetch._ip_is_unsafe", lambda _ip: False)
 
-        # Trust our self-signed CA so the cert validates AGAINST THE HOSTNAME.
-        # Fetcher builds the session internally, so wrap _pinned_session to set
-        # the CA bundle (equivalent to the production default verify=True, just
-        # pointed at our test CA) — we never disable verification.
-        ps = "_pinned_session"
-        real_pinned_session = getattr(fetch, ps)
-
-        def pinned_with_test_ca(host: str, ip: str) -> requests.Session:
-            session = real_pinned_session(host, ip)
-            session.verify = cert_path
-            return session
-
-        monkeypatch.setattr(
-            "webcam_aggregator.fetch._pinned_session", pinned_with_test_ca
-        )
+        # Trust our self-signed CA so the cert validates AGAINST THE HOSTNAME, via
+        # REQUESTS_CA_BUNDLE (requests honours it per-request; equivalent to the
+        # production default verify=True, just pointed at our test CA — never off).
+        monkeypatch.setenv("REQUESTS_CA_BUNDLE", cert_path)
 
         f = Fetcher(delay=0.0, retries=1)
         body = f.get(f"https://{hostname}:{port}/playlist.m3u8")

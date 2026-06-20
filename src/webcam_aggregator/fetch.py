@@ -4,14 +4,14 @@ import ipaddress
 import logging
 import os
 import socket
+import threading
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Protocol, TypeVar, cast, override
+from typing import Any, Protocol, TypeVar
 from urllib.parse import urlencode, urljoin, urlsplit
 
 import requests
-from requests.adapters import HTTPAdapter
 
 log = logging.getLogger("webcam-aggregator.fetch")
 
@@ -97,79 +97,57 @@ def _resolve_validated_ip(url: str) -> str | None:
     return chosen
 
 
-class _PinnedHostAdapter(HTTPAdapter):
-    """A requests adapter that CONNECTS to a pre-validated IP while preserving the
-    original hostname for the HTTP Host header, TLS SNI, AND certificate validation
-    (the "curl --resolve" pattern).
+# --- validate-then-pin DNS (the "curl --resolve" approach) -------------------
+# We let urllib3 connect to the HOSTNAME normally, so SNI, the Host header, and
+# certificate validation are all done against the hostname exactly as usual; we
+# only override the *resolution* of that hostname to the IP we already validated.
+# There is no second DNS lookup between the safety check and the connect, which is
+# what closes the rebinding TOCTOU.
+#
+# (An earlier attempt pinned via a requests adapter + urllib3 pool kwargs. urllib3
+# 2.x ignores `server_hostname` passed that way, so SNI fell back to the IP and
+# Cloudflare 403'd it. Pinning the resolver instead keeps SNI/Host/cert correct,
+# which is exactly what `curl --resolve` does.)
+_pin = threading.local()
+_real_getaddrinfo = socket.getaddrinfo
 
-    Why this closes the DNS-rebinding TOCTOU: we validate the host's IPs once
-    (`_resolve_validated_ip`) and then force urllib3 to dial *that* IP instead of
-    re-resolving the hostname at connect time. An attacker controlling DNS cannot
-    swap in an internal IP between the check and the connect, because there is no
-    second lookup.
 
-    TLS is NOT weakened. We dial the IP but set urllib3's `server_hostname` (SNI)
-    and `assert_hostname` to the ORIGINAL hostname, so the certificate is verified
-    against the hostname exactly as it would be normally. `verify` stays at its
-    default (True); we never touch cert_reqs/assert_hostname=False/verify=False.
-    The Host header is derived by requests from the unchanged request URL, so it
-    too stays the original hostname.
+def _pinning_getaddrinfo(host: Any, *args: Any, **kwargs: Any) -> Any:
+    pinned: dict[str, str] | None = getattr(_pin, "map", None)
+    if pinned and host in pinned:
+        host = pinned[host]  # resolve the pre-validated IP literal, not the hostname
+    return _real_getaddrinfo(host, *args, **kwargs)
 
-    Thread-safety: each adapter is bound to ONE (host, ip) pair and is mounted on a
-    call-local Session (see `_pinned_session`). A Session is only unsafe to share
-    across threads; a fresh per-call Session + adapter is confined to the calling
-    thread, so concurrent Fetcher calls from thread_map workers and the threaded
-    HTTP server never share mutable state."""
 
-    _pin_host: str
-    _pin_ip: str
+# Process-wide but transparent: with no active pin it's a straight passthrough, and
+# pins are thread-local + scoped to a single request (see `_PinDNS`).
+socket.getaddrinfo = _pinning_getaddrinfo
+
+
+class _PinDNS:
+    """Pin `host` -> `ip` for getaddrinfo on THIS thread for the duration of the
+    with-block, so the connection dials the validated IP while urllib3 still does
+    SNI/Host/cert against the hostname. Thread-local, so concurrent fetches from
+    thread_map workers and the HTTP server never see each other's pins."""
+
+    _host: str
+    _ip: str
 
     def __init__(self, host: str, ip: str) -> None:
-        self._pin_host = host
-        self._pin_ip = ip
-        super().__init__(max_retries=0)
+        self._host = host
+        self._ip = ip
 
-    @override
-    def get_connection_with_tls_context(
-        self,
-        request: requests.PreparedRequest,
-        verify: Any,
-        proxies: Any = None,
-        cert: Any = None,
-    ) -> Any:
-        del proxies  # we never proxy; param exists only to match the override
-        host_params, pool_kwargs = self.build_connection_pool_key_attributes(
-            request, verify, cert
-        )
-        # For HTTPS: bind SNI + cert hostname matching to the ORIGINAL host (not the
-        # IP), then repoint the TCP target at the validated IP. urllib3 connects to
-        # host_params["host"] but uses server_hostname for SNI and assert_hostname
-        # for the certificate match — so the cert is still validated against the
-        # hostname while the socket goes to the pinned IP. (These kwargs only exist
-        # on the TLS connection class; a plain http HTTPConnection rejects them, so
-        # only set them for https — http has no TLS to preserve, just the IP pin.)
-        # cast: server_hostname/assert_hostname are valid urllib3 pool kwargs but
-        # aren't in requests' narrow _PoolKwargs TypedDict (cast via object since
-        # the TypedDict doesn't structurally overlap a plain dict).
-        pk = cast(dict[str, Any], cast(object, pool_kwargs))
-        if host_params.get("scheme") == "https":
-            pk["server_hostname"] = self._pin_host
-            pk["assert_hostname"] = self._pin_host
-        host_params["host"] = self._pin_ip
-        return self.poolmanager.connection_from_host(**host_params, pool_kwargs=pk)
+    def __enter__(self) -> None:
+        m: dict[str, str] | None = getattr(_pin, "map", None)
+        if m is None:
+            m = {}
+            _pin.map = m
+        m[self._host] = self._ip
 
-
-def _pinned_session(host: str, ip: str) -> requests.Session:
-    """Build a call-local Session that pins connections to `ip` while presenting
-    `host` for Host/SNI/cert. Call-local (not shared) so it is thread-safe."""
-    session = requests.Session()
-    session.headers["User-Agent"] = UA
-    adapter = _PinnedHostAdapter(host, ip)
-    # Mount for both schemes; the adapter handles http (plain TCP to the IP) and
-    # https (TLS to the IP, SNI/cert against the host) alike.
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
-    return session
+    def __exit__(self, *_exc: object) -> None:
+        m: dict[str, str] | None = getattr(_pin, "map", None)
+        if m is not None:
+            m.pop(self._host, None)
 
 
 class FetcherProtocol(Protocol):
@@ -189,12 +167,15 @@ class FetcherPostProtocol(Protocol):
 
 
 class Fetcher:
+    _session: requests.Session
     _delay: float
     _retries: int
 
     def __init__(self, delay: float = 1.0, retries: int = 3) -> None:
         self._delay = delay
         self._retries = retries
+        self._session = requests.Session()
+        self._session.headers["User-Agent"] = UA
 
     def get(self, url: str, timeout: float = 20.0) -> str | None:
         for attempt in range(self._retries):
@@ -219,8 +200,8 @@ class Fetcher:
                 return None
             host = urlsplit(current).hostname or ""
             # Fresh per-call session pinned to the validated IP (thread-safe).
-            with _pinned_session(host, ip) as session:
-                resp = session.get(
+            with _PinDNS(host, ip):
+                resp = self._session.get(
                     current, timeout=timeout, stream=True, allow_redirects=False
                 )
                 if resp.is_redirect or resp.is_permanent_redirect:
@@ -252,8 +233,8 @@ class Fetcher:
         host = urlsplit(url).hostname or ""
         headers = {"Range": range_header} if range_header else {}
         try:
-            with _pinned_session(host, ip) as session:
-                resp = session.get(
+            with _PinDNS(host, ip):
+                resp = self._session.get(
                     url,
                     headers=headers,
                     timeout=20,
@@ -295,8 +276,8 @@ class Fetcher:
         body = urlencode(data).encode()
         for attempt in range(self._retries):
             try:
-                with _pinned_session(host, ip) as session:
-                    resp = session.post(
+                with _PinDNS(host, ip):
+                    resp = self._session.post(
                         url,
                         data=body,
                         headers=headers or {},

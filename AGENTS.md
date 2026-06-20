@@ -69,15 +69,17 @@ The app is two phases, decoupled by a catalogue snapshot:
 **per-hop redirect re-validation** in the `requests` `Fetcher`; proxied `/m` and `/s`
 URLs are HMAC-signed (`signing.py`) so only server-emitted URLs are fetched.
 **DNS-rebinding TOCTOU is now closed in-app** (no firewall needed): the `Fetcher`
-resolves+validates the host once (`_resolve_validated_ip`) and then **pins the
-connection to that validated IP** (curl `--resolve` style, via `_PinnedHostAdapter`
-on a call-local `requests.Session`), so the HTTP lib never re-resolves between check
-and connect. TLS is **not** weakened — the socket goes to the pinned IP but SNI
-(`server_hostname`) and certificate hostname matching (`assert_hostname`) stay bound
-to the original hostname, and `verify` stays on. **Known residual** (mitigate by
-running behind your own network controls): the **egress-proxy surface** — the proxy
-will sign + fetch any *public* host that appears in an upstream manifest; durable
-fix = a CDN-host allowlist on the rewritten `/m`/`/s` URLs.
+resolves+validates the host once (`_resolve_validated_ip`) and then **pins the DNS
+resolution to that validated IP** for the connect, via a thread-local `getaddrinfo`
+override scoped by `_PinDNS` (the curl `--resolve` approach). urllib3 still connects
+to the hostname, so SNI, the `Host` header, and certificate validation stay bound to
+the original hostname (and `verify` stays on) while the socket goes to the pinned IP;
+there's no second lookup between check and connect. (An earlier adapter + pool-kwargs
+attempt was dropped: urllib3 2.x ignores `server_hostname` passed that way, so SNI
+fell back to the IP and Cloudflare 403'd it.) **Known residual** (mitigate by running
+behind your own network controls): the **egress-proxy surface** — the proxy will sign
+and fetch any *public* host that appears in an upstream manifest; durable fix = a
+CDN-host allowlist on the rewritten `/m`/`/s` URLs.
 
 **Tests:** files are `*_test.py` (the `name-tests-test` hook rejects `test_*.py`).
 The suite is **fully offline** — no real-endpoint/live tests (sources, resolvers,
