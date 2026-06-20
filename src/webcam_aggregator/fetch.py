@@ -17,9 +17,20 @@ MAX_BYTES = 8 * 1024 * 1024  # 8 MB ceiling for any fetched document
 SEGMENT_MAX_BYTES = 16 * 1024 * 1024  # 16 MB ceiling for a proxied media segment
 _MAX_REDIRECTS = 5
 
-# Concurrency for scraping/liveness. The work is I/O-bound (network waits), so the
-# ceiling is politeness to the target host, not local cores — capped accordingly.
-SCRAPE_WORKERS = min(16, (os.cpu_count() or 2) * 4)
+
+def _scrape_workers() -> int:
+    """Concurrency for scraping/liveness. The work is I/O-bound (network waits), so
+    the ceiling is politeness to the target host, not local cores. Override with the
+    SCRAPE_WORKERS env var (e.g. raise it on a small box where the build is slow)."""
+    default = min(16, (os.cpu_count() or 2) * 4)
+    try:
+        v = int(os.environ.get("SCRAPE_WORKERS", ""))
+    except ValueError:
+        return default
+    return max(1, v) if v > 0 else default
+
+
+SCRAPE_WORKERS = _scrape_workers()
 
 _T = TypeVar("_T")
 _R = TypeVar("_R")

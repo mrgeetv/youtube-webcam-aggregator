@@ -54,7 +54,10 @@ def _predisc_key(target: str) -> str | None:
     if m:
         return f"yt:{m.group(1)}"
     if ".m3u8" in t:
-        norm = re.sub(r"[?&](token|expire|hdnts|st|e)=[^&]*", "", t).rstrip("?&")
+        # Strip only unambiguous token params. NOT generic single-letter names like
+        # `st`/`e` — those can be legitimate stream selectors, and stripping them
+        # would collapse two distinct streams to one key (dedup would drop one).
+        norm = re.sub(r"[?&](token|expire|hdnts)=[^&]*", "", t).rstrip("?&")
         return f"hls:{norm}"
     return None
 

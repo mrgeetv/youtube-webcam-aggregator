@@ -50,6 +50,7 @@ Configure these in your `.env` file or pass directly to docker-compose:
 | `SEARCH_QUERY` | built-in webcam query | YouTube search terms (`\|`=OR, space=AND, `-`=exclude) |
 | `LOG_LEVEL` | `INFO` | Logging verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `PORT` | `8000` | HTTP port inside the container |
+| `SCRAPE_WORKERS` | `min(16, cpu×4)` | Concurrency for scraping + liveness during the catalogue build |
 
 ### Using the Run Script
 
@@ -106,6 +107,7 @@ Hooks will run automatically on commit, checking:
 - Type checking (basedpyright)
 - **Tests + coverage (pytest)** — runs the full suite with a coverage floor when
   `src/`, `tests/`, or `requirements*.txt` change
+- **Dead-code detection (vulture)** — flags unused functions/attributes on `src/`
 
 > **Note:** the `pytest` hook calls `pytest` directly, so your dev virtualenv must
 > be active (or otherwise on `PATH`) when committing. The same checks run in CI on
