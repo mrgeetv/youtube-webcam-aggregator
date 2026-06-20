@@ -132,6 +132,9 @@ pytest                                                      # run the suite
 pytest --cov=webcam_aggregator --cov-report=term-missing    # with coverage
 ```
 
+The suite runs in **parallel** via `pytest-xdist` (`-n auto` — one worker per CPU, so
+it adapts to whatever box you're on); run `pytest -n 0` to go serial (e.g. for `pdb`).
+
 The same `pytest` + coverage floor runs as a pre-commit hook (when `src/`, `tests/`,
 or `requirements*.txt` change) and in CI, so a failing test blocks the commit and
 the merge. Test files are named `*_test.py` (enforced by the `name-tests-test` hook).
