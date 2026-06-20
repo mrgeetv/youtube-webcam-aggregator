@@ -14,6 +14,7 @@ import requests
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
 MAX_BYTES = 8 * 1024 * 1024  # 8 MB ceiling for any fetched document
+SEGMENT_MAX_BYTES = 16 * 1024 * 1024  # 16 MB ceiling for a proxied media segment
 _MAX_REDIRECTS = 5
 
 # Concurrency for scraping/liveness. The work is I/O-bound (network waits), so the
@@ -114,3 +115,34 @@ class Fetcher:
                 chunks.append(chunk)
             return b"".join(chunks).decode("utf-8", "replace")
         return None  # too many redirects
+
+    def get_segment(
+        self, url: str, range_header: str | None = None
+    ) -> tuple[int, str, str | None, bytes] | None:
+        """Fetch a media segment as bytes, relaying status + Range. None on failure."""
+        if not is_safe_url(url):
+            return None
+        headers = {"Range": range_header} if range_header else {}
+        try:
+            resp = self._session.get(
+                url, headers=headers, timeout=20, stream=True, allow_redirects=False
+            )
+            if resp.is_redirect or resp.is_permanent_redirect:
+                resp.close()
+                return None  # signed segment URLs shouldn't redirect; refuse
+            chunks: list[bytes] = []
+            total = 0
+            for chunk in resp.iter_content(65536):
+                total += len(chunk)
+                if total > SEGMENT_MAX_BYTES:
+                    resp.close()
+                    return None
+                chunks.append(chunk)
+            return (
+                resp.status_code,
+                resp.headers.get("Content-Type", "video/mp2t"),
+                resp.headers.get("Content-Range"),
+                b"".join(chunks),
+            )
+        except requests.RequestException:
+            return None

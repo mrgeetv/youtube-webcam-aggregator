@@ -97,6 +97,7 @@ def test_end_to_end_server() -> None:
         _BASE_URL,
         _manifest_fetch,
         source_counts=lambda: {"youtube-api": 1},
+        segment_fetch=lambda u, r: (200, "video/mp2t", None, b"seg"),
     )
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler_cls)
     port = server.server_address[1]

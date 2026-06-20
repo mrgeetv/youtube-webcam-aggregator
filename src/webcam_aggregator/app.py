@@ -25,7 +25,7 @@ from .extractors.ytdlp import YtDlpExtractor
 from .fetch import MAX_BYTES, UA, Fetcher, is_safe_url
 from .models import Candidate, CatalogueEntry
 from .registry import Registry
-from .serving import render_playlist, serve_child_manifest, serve_stream
+from .serving import render_playlist, serve_child_manifest, serve_segment, serve_stream
 from .sources.cxtvlive import CxtvliveSource
 from .sources.worldcams import WorldcamsSource
 from .sources.youtube_api import YoutubeApiSource
@@ -158,6 +158,9 @@ def make_handler(
     base_url: str,
     manifest_fetch: Callable[[str], str | None],
     source_counts: Callable[[], dict[str, int]],
+    segment_fetch: Callable[
+        [str, str | None], tuple[int, str, str | None, bytes] | None
+    ],
 ) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
@@ -194,6 +197,35 @@ def make_handler(
                     base_url=base_url,
                 )
                 self._respond(status, ct, body)
+                return
+
+            if path.endswith("/s") and path.startswith("/stream/"):
+                # /stream/<id>/s?u=<url>&sig=<hmac>
+                entry_id = path[len("/stream/") : -len("/s")]
+                u_list = qs.get("u", [])
+                if not u_list:
+                    self._respond(400, "text/plain", b"missing u= param")
+                    return
+                sig_list = qs.get("sig", [])
+                if not sig_list:
+                    self._respond(403, "text/plain", b"bad signature")
+                    return
+                range_header = self.headers.get("Range")
+                seg_status, seg_ct, seg_cr, seg_body = serve_segment(
+                    entry_id,
+                    u_list[0],
+                    sig_list[0],
+                    fetch_segment=segment_fetch,
+                    range_header=range_header,
+                )
+                self.send_response(seg_status)
+                self.send_header("Content-Type", seg_ct)
+                self.send_header("Accept-Ranges", "bytes")
+                if seg_cr is not None:
+                    self.send_header("Content-Range", seg_cr)
+                self.send_header("Content-Length", str(len(seg_body)))
+                self.end_headers()
+                self.wfile.write(seg_body)
                 return
 
             if path.startswith("/stream/"):
@@ -346,6 +378,7 @@ def main() -> None:
         cfg.public_base_url,
         manifest_fetch=manifest_fetcher.get,
         source_counts=source_counts,
+        segment_fetch=manifest_fetcher.get_segment,
     )
     run_http_server(handler_cls, port=cfg.port)
 

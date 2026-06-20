@@ -8,6 +8,7 @@ from webcam_aggregator.models import CatalogueEntry
 from webcam_aggregator.serving import (
     rewrite_manifest,
     render_playlist,
+    serve_segment,
     serve_stream,
     serve_child_manifest,
 )
@@ -339,3 +340,159 @@ def test_rewrite_manifest_output_contains_sig_param() -> None:
     lines = [ln for ln in out.splitlines() if ln and not ln.startswith("#")]
     for line in lines:
         assert "&sig=" in line, f"missing &sig= in: {line!r}"
+
+
+# ---------------------------------------------------------------------------
+# 7. rewrite_manifest — proxy_segments flag
+# ---------------------------------------------------------------------------
+
+WOWZA_WITH_SEGMENT = """\
+#EXTM3U
+chunklist_w1.m3u8
+media_1.ts
+"""
+
+WOWZA_UPSTREAM_2 = "https://cdn.x/cam/playlist.m3u8"
+
+
+def test_rewrite_manifest_proxy_segments_true_routes_ts_through_s() -> None:
+    """With proxy_segments=True, .ts refs must become /stream/<id>/s?u=…&sig=…"""
+    absolute_seg = "https://cdn.x/cam/media_1.ts"
+    expected_prefix = (
+        f"{BASE}/stream/{ENTRY_ID}/s?u={quote(absolute_seg, safe='')}&sig="
+    )
+    out = rewrite_manifest(
+        WOWZA_WITH_SEGMENT,
+        upstream_url=WOWZA_UPSTREAM_2,
+        entry_id=ENTRY_ID,
+        base_url=BASE,
+        proxy_segments=True,
+    )
+    assert expected_prefix in out
+    # The child .m3u8 must still go through /m
+    expected_child_prefix = f"{BASE}/stream/{ENTRY_ID}/m?u="
+    assert expected_child_prefix in out
+
+
+def test_rewrite_manifest_proxy_segments_false_ts_stays_absolute() -> None:
+    """With proxy_segments=False (default), segment refs must remain absolute."""
+    absolute_seg = "https://cdn.x/cam/media_1.ts"
+    out = rewrite_manifest(
+        WOWZA_WITH_SEGMENT,
+        upstream_url=WOWZA_UPSTREAM_2,
+        entry_id=ENTRY_ID,
+        base_url=BASE,
+        proxy_segments=False,
+    )
+    assert absolute_seg in out
+    assert f"{BASE}/stream/{ENTRY_ID}/s?" not in out
+
+
+def test_rewrite_manifest_default_proxy_segments_same_as_false() -> None:
+    """proxy_segments defaults to False — existing callers unaffected."""
+    out_default = rewrite_manifest(
+        WOWZA_WITH_SEGMENT,
+        upstream_url=WOWZA_UPSTREAM_2,
+        entry_id=ENTRY_ID,
+        base_url=BASE,
+    )
+    out_false = rewrite_manifest(
+        WOWZA_WITH_SEGMENT,
+        upstream_url=WOWZA_UPSTREAM_2,
+        entry_id=ENTRY_ID,
+        base_url=BASE,
+        proxy_segments=False,
+    )
+    assert out_default == out_false
+
+
+# ---------------------------------------------------------------------------
+# 8. serve_stream — baltic segments proxied through /s
+# ---------------------------------------------------------------------------
+
+BALTIC_MANIFEST = "#EXTM3U\nseg_001.ts\n"
+BALTIC_URL = "https://edge01.balticlivecam.com/stream/cam/playlist.m3u8"
+
+
+def test_serve_stream_baltic_segments_proxied_via_s() -> None:
+    """Resolved URL on balticlivecam.com → segment lines become /stream/<id>/s?u=…"""
+    resolved = Resolved(url=BALTIC_URL, stream_type="hls", ttl_seconds=60)
+    cache = _make_cache(resolved)
+    entry = _entry(target_url="https://balticlivecam.com/cam")
+
+    status, ct, body = serve_stream(
+        ENTRY_ID,
+        catalogue={ENTRY_ID: entry},
+        cache=cache,
+        fetch=lambda u: BALTIC_MANIFEST,
+        base_url=BASE,
+    )
+    assert status == 200
+    assert "mpegurl" in ct
+    text = body.decode()
+    absolute_seg = "https://edge01.balticlivecam.com/stream/cam/seg_001.ts"
+    expected_prefix = (
+        f"{BASE}/stream/{ENTRY_ID}/s?u={quote(absolute_seg, safe='')}&sig="
+    )
+    assert expected_prefix in text
+
+
+# ---------------------------------------------------------------------------
+# 9. serve_segment
+# ---------------------------------------------------------------------------
+
+
+def test_serve_segment_valid_sig_relays_result() -> None:
+    url = "https://edge01.balticlivecam.com/stream/cam/seg_001.ts"
+    sig = sign(url)
+
+    def fake_fetch(u: str, _r: str | None) -> tuple[int, str, str | None, bytes] | None:
+        assert u == url
+        return (206, "video/mp2t", "bytes 0-10/100", b"data")
+
+    status, ct, cr, body = serve_segment(
+        ENTRY_ID, url, sig, fetch_segment=fake_fetch, range_header="bytes=0-10"
+    )
+    assert status == 206
+    assert ct == "video/mp2t"
+    assert cr == "bytes 0-10/100"
+    assert body == b"data"
+
+
+def test_serve_segment_bad_sig_returns_403() -> None:
+    url = "https://edge01.balticlivecam.com/stream/cam/seg_001.ts"
+    status, _, cr, body = serve_segment(
+        ENTRY_ID,
+        url,
+        "0" * 32,
+        fetch_segment=lambda u, r: (200, "video/mp2t", None, b"data"),
+    )
+    assert status == 403
+    assert b"bad signature" in body
+    assert cr is None
+
+
+def test_serve_segment_empty_sig_returns_403() -> None:
+    url = "https://edge01.balticlivecam.com/stream/cam/seg_001.ts"
+    status, _, _cr, body = serve_segment(
+        ENTRY_ID,
+        url,
+        "",
+        fetch_segment=lambda u, r: (200, "video/mp2t", None, b"data"),
+    )
+    assert status == 403
+    assert b"bad signature" in body
+
+
+def test_serve_segment_fetch_failure_returns_502() -> None:
+    url = "https://edge01.balticlivecam.com/stream/cam/seg_001.ts"
+    sig = sign(url)
+    status, _, cr, body = serve_segment(
+        ENTRY_ID,
+        url,
+        sig,
+        fetch_segment=lambda u, r: None,
+    )
+    assert status == 502
+    assert b"segment fetch failed" in body
+    assert cr is None

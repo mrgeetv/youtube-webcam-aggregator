@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import Callable, Mapping
 from urllib.parse import quote, urljoin, urlsplit
@@ -7,6 +8,8 @@ from urllib.parse import quote, urljoin, urlsplit
 from .cache import ResolveCache
 from .models import CatalogueEntry
 from .signing import sign, verify
+
+log = logging.getLogger("webcam-aggregator.serving")
 
 _HLS_CT = "application/vnd.apple.mpegurl"
 _NONCOMMENT = re.compile(r"^(?!#)(\S+)\s*$", re.M)
@@ -23,8 +26,21 @@ def _is_direct_playback(url: str) -> bool:
     return any(host == h or host.endswith("." + h) for h in _DIRECT_PLAYBACK_HOSTS)
 
 
+# Hosts whose segments are token/IP-bound to OUR fetch (e.g. baltic's auth token):
+# the player can't fetch them directly, so we relay the segment bytes too.
+_PROXY_SEGMENT_HOSTS = ("balticlivecam.com",)
+
+
+def _proxy_segments_for(url: str) -> bool:
+    host = urlsplit(url).hostname or ""
+    return any(host == h or host.endswith("." + h) for h in _PROXY_SEGMENT_HOSTS)
+
+
 # (status_code, content_type_or_location, body)
 Response = tuple[int, str, bytes]
+
+# (status_code, content_type, content_range_or_None, body)
+SegmentResponse = tuple[int, str, str | None, bytes]
 
 
 def render_playlist(entries: list[CatalogueEntry], *, base_url: str) -> str:
@@ -36,13 +52,20 @@ def render_playlist(entries: list[CatalogueEntry], *, base_url: str) -> str:
 
 
 def rewrite_manifest(
-    text: str, *, upstream_url: str, entry_id: str, base_url: str
+    text: str,
+    *,
+    upstream_url: str,
+    entry_id: str,
+    base_url: str,
+    proxy_segments: bool = False,
 ) -> str:
     def repl(m: re.Match[str]) -> str:
         ref = m.group(1)
         absolute = urljoin(upstream_url, ref)
         if absolute.split("?", 1)[0].endswith(".m3u8"):
             return f"{base_url}/stream/{entry_id}/m?u={quote(absolute, safe='')}&sig={sign(absolute)}"
+        if proxy_segments:
+            return f"{base_url}/stream/{entry_id}/s?u={quote(absolute, safe='')}&sig={sign(absolute)}"
         return absolute
 
     return _NONCOMMENT.sub(repl, text)
@@ -61,6 +84,7 @@ def serve_stream(
         return (404, "text/plain", b"unknown stream")
     resolved = cache.get(entry_id, entry.target_url)
     if resolved is None:
+        log.warning("resolve failed: %s -> %s", entry_id, entry.target_url)
         return (502, "text/plain", b"resolve failed")
     if resolved.stream_type == "mp4":
         return (302, resolved.url, b"")  # redirect; 2nd field is the Location
@@ -69,9 +93,14 @@ def serve_stream(
         return (302, resolved.url, b"")
     manifest = fetch(resolved.url)
     if manifest is None:
+        log.warning("manifest fetch failed: %s -> %s", entry_id, resolved.url)
         return (502, "text/plain", b"upstream manifest fetch failed")
     body = rewrite_manifest(
-        manifest, upstream_url=resolved.url, entry_id=entry_id, base_url=base_url
+        manifest,
+        upstream_url=resolved.url,
+        entry_id=entry_id,
+        base_url=base_url,
+        proxy_segments=_proxy_segments_for(resolved.url),
     )
     return (200, _HLS_CT, body.encode())
 
@@ -90,6 +119,29 @@ def serve_child_manifest(
     if manifest is None:
         return (502, "text/plain", b"upstream manifest fetch failed")
     body = rewrite_manifest(
-        manifest, upstream_url=upstream_url, entry_id=entry_id, base_url=base_url
+        manifest,
+        upstream_url=upstream_url,
+        entry_id=entry_id,
+        base_url=base_url,
+        proxy_segments=_proxy_segments_for(upstream_url),
     )
     return (200, _HLS_CT, body.encode())
+
+
+def serve_segment(
+    entry_id: str,
+    upstream_url: str,
+    sig: str,
+    *,
+    fetch_segment: Callable[
+        [str, str | None], tuple[int, str, str | None, bytes] | None
+    ],
+    range_header: str | None = None,
+) -> SegmentResponse:
+    if not verify(upstream_url, sig):
+        return (403, "text/plain", None, b"bad signature")
+    result = fetch_segment(upstream_url, range_header)
+    if result is None:
+        log.warning("segment fetch failed: %s -> %s", entry_id, upstream_url)
+        return (502, "text/plain", None, b"segment fetch failed")
+    return result
