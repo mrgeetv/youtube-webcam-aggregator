@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 
@@ -7,6 +8,8 @@ from .categories import map_category
 from .dedup import dedupe
 from .models import Candidate, CatalogueEntry, stable_id
 from .sources.base import Source
+
+log = logging.getLogger("webcam-aggregator.catalogue")
 
 DROP_THRESHOLD = 0.5
 AGREE_TO_ACCEPT = 2
@@ -42,7 +45,11 @@ def build_catalogue(
     # Cross-source dedup runs ONCE at the end so the same cam from two sources collapses.
     kept_all: list[Candidate] = []
     for src in sources:
-        cands = list(src.discover())
+        try:
+            cands = list(src.discover())
+        except Exception:
+            log.exception("source %s discover() failed", src.name)
+            cands = []
         yt_ids = [
             c.predisc_key[3:]
             for c in cands
@@ -56,6 +63,7 @@ def build_catalogue(
             return is_alive(c)
 
         kept = [c for c in cands if alive(c)]
+        log.info("%s: %d kept / %d discovered", src.name, len(kept), len(cands))
 
         h = history.setdefault(src.name, Hist())
         collapsed = (
@@ -66,6 +74,14 @@ def build_catalogue(
         if collapsed:
             h.shrink_streak += 1
             if h.shrink_streak < AGREE_TO_ACCEPT:
+                log.warning(
+                    "%s collapsed to %d (< %.0f%% of last %d); keeping previous %d",
+                    src.name,
+                    len(kept),
+                    DROP_THRESHOLD * 100,
+                    h.last_count,
+                    len(h.last_kept),
+                )
                 kept_all.extend(h.last_kept)  # guard: reuse this source's last good set
                 continue
         h.shrink_streak = 0

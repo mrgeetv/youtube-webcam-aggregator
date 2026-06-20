@@ -15,20 +15,22 @@ import psutil
 from . import config
 from .cache import ResolveCache
 from .catalogue import Hist, build_catalogue
-from .extractors.base import Resolved
+from .extractors.base import Extractor, Resolved
 from .extractors.baltic import BalticResolver
 from .extractors.direct_hls import DirectHls
 from .extractors.ipcamlive import IpcamliveResolver
 from .extractors.metatag import MetaTagExtractor
 from .extractors.ytdlp import YtDlpExtractor
-from .fetch import MAX_BYTES, Fetcher, is_safe_url
+from .fetch import MAX_BYTES, UA, Fetcher, is_safe_url
 from .models import Candidate, CatalogueEntry
 from .registry import Registry
 from .serving import render_playlist, serve_child_manifest, serve_stream
+from .sources.cxtvlive import CxtvliveSource
+from .sources.worldcams import WorldcamsSource
+from .sources.youtube_api import YoutubeApiSource
 
 log = logging.getLogger("webcam-aggregator")
 _HLS_CT = "application/vnd.apple.mpegurl"
-_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36"
 
 
 def origin_of(url: str) -> str:
@@ -39,7 +41,7 @@ def origin_of(url: str) -> str:
 def _http_get(url: str) -> str:
     if not is_safe_url(url):
         raise ValueError(f"unsafe url: {url}")
-    req = urllib.request.Request(url, headers={"User-Agent": _UA})
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
     with urllib.request.urlopen(req, timeout=20) as r:
         data = r.read(MAX_BYTES + 1)
         if len(data) > MAX_BYTES:
@@ -51,11 +53,10 @@ def _http_post(url: str, data: dict[str, str]) -> str:
     if not is_safe_url(url):
         raise ValueError(f"unsafe url: {url}")
     body = urllib.parse.urlencode(data).encode()
-    referer = origin_of(url)
     headers = {
-        "User-Agent": _UA,
+        "User-Agent": UA,
         "X-Requested-With": "XMLHttpRequest",
-        "Referer": referer,
+        "Referer": origin_of(url),
     }
     req = urllib.request.Request(url, data=body, headers=headers)
     with urllib.request.urlopen(req, timeout=20) as r:
@@ -72,7 +73,7 @@ def _is_ytdlp(u: str) -> bool:
     )
 
 
-def build_registry(_extractors: dict[str, Any]) -> Registry:
+def build_registry(extractors: dict[str, Extractor]) -> Registry:
     rules: list[tuple[Callable[[str], bool], str]] = [
         (lambda u: "balticlivecam.com" in u, "baltic"),
         (lambda u: "ipcamlive.com/player/player.php" in u, "ipcamlive"),
@@ -80,18 +81,21 @@ def build_registry(_extractors: dict[str, Any]) -> Registry:
         (lambda u: _is_ytdlp(u), "ytdlp"),
         (lambda u: ".m3u8" in u or "worldcams.tv/player?url=" in u, "direct"),
     ]
+    for _predicate, name in rules:
+        if name not in extractors:
+            raise ValueError(f"registry rule references unknown extractor {name!r}")
     return Registry(rules)
 
 
 def make_resolve(
-    registry: Registry, extractors: dict[str, Any]
+    registry: Registry, extractors: dict[str, Extractor]
 ) -> Callable[[str, str], Resolved]:
     def resolve(_entry_id: str, target_url: str) -> Resolved:
         name = registry.match(target_url, resolve_redirect=lambda u: u)
         if name is None:
+            log.warning("no extractor matched target %s", target_url)
             raise ValueError(f"no extractor for {target_url}")
-        result: Resolved = extractors[name].resolve(target_url)
-        return result
+        return extractors[name].resolve(target_url)
 
     return resolve
 
@@ -119,7 +123,8 @@ def make_is_alive(
         try:
             resolve("probe", c.target_url)
             return True
-        except Exception:
+        except Exception as exc:
+            log.debug("liveness probe failed for %s: %s", c.target_url, exc)
             return False
 
     return is_alive
@@ -130,6 +135,7 @@ def make_handler(
     cache: ResolveCache,
     base_url: str,
     manifest_fetch: Callable[[str], str | None],
+    source_counts: Callable[[], dict[str, int]],
 ) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
@@ -148,7 +154,7 @@ def make_handler(
                 return
 
             if path.endswith("/m") and path.startswith("/stream/"):
-                # /stream/<id>/m?u=<url>
+                # /stream/<id>/m?u=<url>&sig=<hmac>
                 entry_id = path[len("/stream/") : -len("/m")]
                 u_list = qs.get("u", [])
                 if not u_list:
@@ -158,10 +164,12 @@ def make_handler(
                 if not sig_list:
                     self._respond(403, "text/plain", b"bad signature")
                     return
-                upstream_url = u_list[0]
-                sig = sig_list[0]
                 status, ct, body = serve_child_manifest(
-                    entry_id, upstream_url, sig, fetch=manifest_fetch, base_url=base_url
+                    entry_id,
+                    u_list[0],
+                    sig_list[0],
+                    fetch=manifest_fetch,
+                    base_url=base_url,
                 )
                 self._respond(status, ct, body)
                 return
@@ -189,6 +197,7 @@ def make_handler(
                     "status": "ok",
                     "ready": store.ready,
                     "streams": len(snapshot),
+                    "sources": source_counts(),
                     "rss_mb": round(psutil.Process().memory_info().rss / 1048576, 1),
                 }
                 self._respond(200, "application/json", json.dumps(payload).encode())
@@ -221,10 +230,15 @@ def run_http_server(
 
 def build_app(
     cfg: config.Config,
-) -> tuple[CatalogueStore, ResolveCache, Callable[[], None]]:
+) -> tuple[
+    CatalogueStore,
+    ResolveCache,
+    Callable[[], None],
+    Callable[[], dict[str, int]],
+]:
     fetcher = Fetcher()
 
-    extractors: dict[str, Any] = {
+    extractors: dict[str, Extractor] = {
         "ytdlp": YtDlpExtractor(),
         "direct": DirectHls(),
         "metatag": MetaTagExtractor(_http_get),
@@ -242,29 +256,29 @@ def build_app(
             "youtube", "v3", developerKey=cfg.youtube_api_key
         )
     except Exception:
+        log.exception("YouTube client init failed; youtube-api source disabled")
         yt_client = None
 
-    from .sources.youtube_api import YoutubeApiSource
-    from .sources.worldcams import WorldcamsSource
-    from .sources.cxtvlive import CxtvliveSource
-
-    search_query = "webcam live outdoor scenic"
-    sources = [
-        YoutubeApiSource(yt_client, search_query) if yt_client is not None else None,
-        WorldcamsSource(fetcher),
-        CxtvliveSource(fetcher),
+    yt_source = (
+        YoutubeApiSource(yt_client, cfg.search_query) if yt_client is not None else None
+    )
+    active_sources: list[Any] = [
+        s
+        for s in (yt_source, WorldcamsSource(fetcher), CxtvliveSource(fetcher))
+        if s is not None
     ]
-    active_sources: list[Any] = [s for s in sources if s is not None]
 
     store = CatalogueStore()
     history: dict[str, Hist] = {}
     is_alive = make_is_alive(resolve)
 
     def youtube_live(ids: Any) -> set[str]:
-        if yt_client is None:
+        if yt_source is None:
             return set()
-        yt_src = YoutubeApiSource(yt_client, search_query)
-        return yt_src.live_ids(ids)
+        return yt_source.live_ids(ids)
+
+    def source_counts() -> dict[str, int]:
+        return {name: (h.last_count or 0) for name, h in history.items()}
 
     def rebuild_once() -> None:
         log.info("starting catalogue rebuild")
@@ -277,24 +291,26 @@ def build_app(
         store.swap(entries)
         log.info("catalogue rebuilt: %d entries", len(entries))
 
-    return store, cache, rebuild_once
+    return store, cache, rebuild_once, source_counts
 
 
 def main() -> None:
+    cfg = config.load()
     logging.basicConfig(
-        level=logging.INFO,
+        level=getattr(logging, cfg.log_level, logging.INFO),
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
-    cfg = config.load()
-    store, cache, rebuild_once = build_app(cfg)
+    store, cache, rebuild_once, source_counts = build_app(cfg)
 
+    manifest_fetcher = Fetcher(delay=0.0, retries=1)
     handler_cls = make_handler(
         store,
         cache,
         cfg.public_base_url,
-        manifest_fetch=lambda url: Fetcher(delay=0.0, retries=1).get(url),
+        manifest_fetch=manifest_fetcher.get,
+        source_counts=source_counts,
     )
-    run_http_server(handler_cls, port=8000)
+    run_http_server(handler_cls, port=cfg.port)
 
     while True:
         try:

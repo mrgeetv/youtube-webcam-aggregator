@@ -21,3 +21,24 @@ def test_interval_floor_and_bad_value():
     assert floored.catalogue_interval_hours == 1
     bad = config.load({"YOUTUBE_API_KEY": "k", "CATALOGUE_INTERVAL_HOURS": "x"})
     assert bad.catalogue_interval_hours == 6
+
+
+def test_new_field_defaults():
+    c = config.load({"YOUTUBE_API_KEY": "k"})
+    assert c.search_query  # non-empty built-in default
+    assert c.log_level == "INFO"
+    assert c.port == 8000
+
+
+def test_new_fields_from_env():
+    c = config.load(
+        {
+            "YOUTUBE_API_KEY": "k",
+            "SEARCH_QUERY": "trains|railway",
+            "LOG_LEVEL": "debug",
+            "PORT": "9000",
+        }
+    )
+    assert c.search_query == "trains|railway"
+    assert c.log_level == "DEBUG"  # normalised to upper-case
+    assert c.port == 9000

@@ -91,7 +91,13 @@ def test_end_to_end_server() -> None:
     entry_id = list(store.snapshot().keys())[0]
 
     # Start server on port 0 (OS assigns free port)
-    handler_cls = make_handler(store, cache, _BASE_URL, _manifest_fetch)
+    handler_cls = make_handler(
+        store,
+        cache,
+        _BASE_URL,
+        _manifest_fetch,
+        source_counts=lambda: {"youtube-api": 1},
+    )
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler_cls)
     port = server.server_address[1]
 
@@ -134,6 +140,7 @@ def test_end_to_end_server() -> None:
         health = json.loads(resp.read())
         assert health["streams"] == 1, f"expected streams=1, got {health}"
         assert health["ready"] is True
+        assert health["sources"] == {"youtube-api": 1}, f"bad sources: {health}"
 
         conn.close()
     finally:

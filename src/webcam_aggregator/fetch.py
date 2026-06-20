@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 
 import requests
 
-_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
 MAX_BYTES = 8 * 1024 * 1024  # 8 MB ceiling for any fetched document
 
@@ -50,7 +50,7 @@ class Fetcher:
         self._delay = delay
         self._retries = retries
         self._session = requests.Session()
-        self._session.headers["User-Agent"] = _UA
+        self._session.headers["User-Agent"] = UA
 
     def get(self, url: str, timeout: float = 20.0) -> str | None:
         if not is_safe_url(url):
