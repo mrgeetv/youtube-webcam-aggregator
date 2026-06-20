@@ -106,8 +106,8 @@ Pre-commit hooks enforced:
 This project enforces Python version consistency:
 
 - `.python-version` - Source of truth (currently 3.14)
-- `Dockerfile` - Must use `FROM python:{version}-slim` matching .python-version
-- `docker-compose.yml` - Must have RUNTIME_IMAGE arg matching .python-version
+- `Dockerfile` - `ARG RUNTIME_IMAGE` default must use `dhi.io/python:{version}-alpine3.24`
+- `docker-compose.yml` - `RUNTIME_IMAGE` build arg must use `python:{version}-slim`
 - `pyrightconfig.json` - Must have `pythonVersion` matching .python-version
 - Pre-commit hook validates synchronization automatically
 - CI uses .python-version for GitHub Actions Python setup
@@ -115,8 +115,8 @@ This project enforces Python version consistency:
 **When updating Python version:**
 
 1. Update `.python-version` file
-2. Update `Dockerfile` FROM line to match
-3. Update `docker-compose.yml` RUNTIME_IMAGE arg to match
+2. Update `Dockerfile` `ARG RUNTIME_IMAGE` and `ARG BUILD_IMAGE` defaults to match
+3. Update `docker-compose.yml` `RUNTIME_IMAGE` and `BUILD_IMAGE` args to match
 4. Update `pyrightconfig.json` pythonVersion to match
 5. Pre-commit hook validates consistency
 6. Test Docker build before committing

@@ -45,12 +45,9 @@ Configure these in your `.env` file or pass directly to docker-compose:
 | Variable | Default | Description |
 | -------- | ------- | ----------- |
 | `YOUTUBE_API_KEY` | (required) | YouTube Data API v3 key |
+| `PUBLIC_BASE_URL` | `http://localhost:8000` | Base URL used in playlist and manifest links |
+| `CATALOGUE_INTERVAL_HOURS` | `6` | Hours between catalogue refresh cycles |
 | `LOG_LEVEL` | `INFO` | Logging verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
-| `UPDATE_INTERVAL_HOURS` | `5` | Hours between playlist refresh cycles |
-| `MAX_VIDEOS_PER_CYCLE` | `1000` | Maximum videos to process per cycle (memory limit) |
-| `CONCURRENT_EXTRACTIONS` | `1` | Parallel yt-dlp extractions (raise cautiously; YouTube aggressively flags concurrent requests as bots) |
-| `EXCLUDED_CATEGORIES` | `Gaming,Sports,Film & Animation,Howto & Style` | YouTube categories to exclude |
-| `SEARCH_QUERY` | (see docker-compose.yml) | Search terms for finding live webcams |
 
 ### Using the Run Script
 
@@ -115,16 +112,37 @@ pre-commit run --all-files
 
 ```text
 youtube-webcam-aggregator/
-├── src/                    # Python source code
-│   └── get_streams.py      # Main application
-├── scripts/                # Helper scripts
-│   ├── run.sh              # Docker build/run script
+├── src/
+│   └── webcam_aggregator/      # v2 application package
+│       ├── __main__.py         # Entry point (python -m webcam_aggregator)
+│       ├── app.py              # App wiring and main loop
+│       ├── config.py           # Environment variable config
+│       ├── models.py           # Data contracts and stream models
+│       ├── fetch.py            # HTTP fetch helpers
+│       ├── registry.py         # Extractor registry
+│       ├── dedup.py            # Deduplication and field merge
+│       ├── categories.py       # Category taxonomy mapping
+│       ├── catalogue.py        # Catalogue builder and liveness validation
+│       ├── cache.py            # Resolve cache (TTL, LRU, negative caching)
+│       ├── serving.py          # HTTP server (playlist, health, manifest proxy)
+│       ├── extractors/         # Stream URL extractors
+│       │   ├── ytdlp.py        # yt-dlp extractor
+│       │   ├── direct_hls.py   # Direct HLS link extractor
+│       │   ├── metatag.py      # HTML meta-tag extractor
+│       │   ├── baltic.py       # Baltic Live cam extractor
+│       │   └── ipcamlive.py    # IPCamLive extractor
+│       └── sources/            # Stream discovery sources
+│           ├── youtube_api.py  # YouTube Data API v3 source
+│           ├── worldcams.py    # Worldcams.net scraper source
+│           └── cxtvlive.py     # CXTV Live scraper source
+├── scripts/                    # Helper scripts
+│   ├── run.sh                  # Docker build/run script
 │   └── check-python-version.sh
-├── .github/workflows/      # CI/CD pipelines
-├── Dockerfile              # Container definition
-├── docker-compose.yml      # Development compose file
-├── requirements.txt        # Python dependencies
-└── requirements-dev.txt    # Development dependencies
+├── .github/workflows/          # CI/CD pipelines
+├── Dockerfile                  # Container definition
+├── docker-compose.yml          # Development compose file
+├── requirements.txt            # Python dependencies
+└── requirements-dev.txt        # Development dependencies
 ```
 
 ## Port Configuration
@@ -132,7 +150,8 @@ youtube-webcam-aggregator/
 - **Internal port:** 8000 (hardcoded in Python application)
 - **Docker Compose port:** 23457 (mapped from 8000)
 
-The HTTP server uses a custom handler serving only `/playlist.m3u8` and `/health` endpoints.
+The HTTP server serves `/playlist.m3u8`, `/health`, and `/stream/<id>.m3u8`
+(per-stream manifest proxy) endpoints.
 
 ## Debugging
 
@@ -149,18 +168,8 @@ Available levels: `DEBUG`, `INFO`, `WARNING`, `ERROR`
 
 ### Memory Tracking
 
-When `LOG_LEVEL=DEBUG`, memory usage is logged at:
-
-- Start and end of each scrape cycle
-- After each batch of 50 videos processed
-
-Example output:
-
-```text
-2024-01-15 10:30:00 DEBUG [webcam-scraper] Memory: 145 MB
-```
-
-This helps identify memory leaks from yt-dlp.
+When `LOG_LEVEL=DEBUG`, memory usage is logged at the start and end of each
+catalogue refresh cycle. This helps identify memory leaks from yt-dlp.
 
 ### Viewing Debug Logs
 

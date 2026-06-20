@@ -30,7 +30,7 @@ RUN pip3 install --no-cache-dir --target=/deps -r requirements.txt
 FROM ${RUNTIME_IMAGE}
 
 ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/deps
+ENV PYTHONPATH=/deps:/app/src
 ENV PATH="/deps/bin:$PATH"
 
 WORKDIR /app
@@ -47,13 +47,11 @@ COPY --from=deno_src /usr/local/lib/glibc /usr/local/lib/glibc
 # Copy installed dependencies from builder
 COPY --from=builder /deps /deps
 
-# Copy source code
-COPY src/ ./src/
-
-WORKDIR /app/src
+# Copy application package
+COPY src/webcam_aggregator/ ./src/webcam_aggregator/
 
 # Health check (uses stdlib urllib - no curl/wget in DHI images)
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
   CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
-CMD ["python3", "get_streams.py"]
+CMD ["python3", "-m", "webcam_aggregator"]
