@@ -234,3 +234,19 @@ def test_default_ttl_when_none() -> None:
     clock.t = DEFAULT_TTL * TTL_FACTOR + 1.0
     cache.get("cam1", "http://t")
     assert call_count == 2
+
+
+def test_non_positive_ttl_not_cached() -> None:
+    """An already-expired token (ttl_seconds <= 0) must NOT be cached for DEFAULT_TTL."""
+    clock = _Clock()
+    calls = 0
+
+    def resolve(_entry_id: str, _target_url: str) -> Resolved:
+        nonlocal calls
+        calls += 1
+        return _resolved(ttl=0)  # token already expired
+
+    cache = ResolveCache(resolve, clock=clock)
+    cache.get("cam", "http://t")
+    cache.get("cam", "http://t")  # ttl<=0 → not cached → resolves again
+    assert calls == 2

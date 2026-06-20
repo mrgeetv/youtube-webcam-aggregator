@@ -57,11 +57,13 @@ def build_catalogue(
     # Cross-source dedup runs ONCE at the end so the same cam from two sources collapses.
     kept_all: list[Candidate] = []
     for src in sources:
+        crashed = False
         try:
             cands = list(src.discover())
         except Exception:
             log.exception("source %s discover() failed", src.name)
             cands = []
+            crashed = True
         yt_ids = [
             c.predisc_key[3:]
             for c in cands
@@ -82,6 +84,15 @@ def build_catalogue(
         log.info("%s: %d kept / %d discovered", src.name, len(kept), len(cands))
 
         h = history.setdefault(src.name, Hist())
+        if crashed and h.last_kept:
+            # A crash is not a genuine "0 cams" result — reuse the last good set and
+            # leave history untouched, so two consecutive crashes can't get accepted
+            # as an empty set (which would wipe last_kept and disable the guard).
+            log.warning(
+                "%s discover crashed; reusing previous %d", src.name, len(h.last_kept)
+            )
+            kept_all.extend(h.last_kept)
+            continue
         collapsed = (
             h.last_count is not None
             and h.last_count > 0

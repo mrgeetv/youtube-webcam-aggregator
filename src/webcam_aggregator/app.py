@@ -350,10 +350,21 @@ def build_app(
     def youtube_live(ids: Any) -> dict[str, str]:
         if yt_source is None:
             return {}
-        return yt_source.live_ids(ids)
+        try:
+            return yt_source.live_ids(ids)
+        except Exception:
+            # A YouTube quota/transient error must not abort the whole rebuild —
+            # just treat YT cams as offline this cycle (scrapers still build).
+            log.exception("youtube live_ids failed; treating YT cams as offline")
+            return {}
 
     def source_counts() -> dict[str, int]:
-        return {name: (h.last_count or 0) for name, h in history.items()}
+        # Copy defensively: build_catalogue mutates `history` from the rebuild thread,
+        # so a live /health request must not crash on "changed size during iteration".
+        try:
+            return {name: (h.last_count or 0) for name, h in list(history.items())}
+        except RuntimeError:
+            return {}
 
     def rebuild_once() -> None:
         log.info("starting catalogue rebuild")

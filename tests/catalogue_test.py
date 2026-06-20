@@ -364,3 +364,39 @@ def test_empty_guard_streak_increments_then_resets() -> None:
     assert len(second) == 2
     assert history["worldcams"].shrink_streak == 0  # reset after acceptance
     assert history["worldcams"].last_count == 2  # updated to new small count
+
+
+def test_crash_reuses_last_good_set_and_never_wipes() -> None:
+    """A source whose discover() raises reuses its last good set across repeated
+    crashes — two consecutive crashes must NOT be accepted as an empty set."""
+    cam = _make_candidate(
+        source="worldcams",
+        key="hls:a",
+        page="https://example.com/a",
+        target="https://example.com/a.m3u8",
+    )
+
+    class _CrashSrc:
+        name: str = "worldcams"
+        calls: int
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def discover(self) -> list[Candidate]:
+            self.calls += 1
+            if self.calls == 1:
+                return [cam]
+            raise RuntimeError("boom")
+
+    src = _CrashSrc()
+    history: dict[str, Hist] = {}
+    first = build_catalogue(
+        [src], is_alive=_always_alive, youtube_live=_no_yt_live, history=history
+    )
+    assert len(first) == 1
+    for _ in range(2):  # the old bug wiped last_kept on the 2nd consecutive crash
+        result = build_catalogue(
+            [src], is_alive=_always_alive, youtube_live=_no_yt_live, history=history
+        )
+        assert len(result) == 1

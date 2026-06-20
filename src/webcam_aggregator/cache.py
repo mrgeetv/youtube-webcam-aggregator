@@ -64,7 +64,13 @@ class ResolveCache:
                     return e.resolved
             try:
                 resolved = self._resolve(entry_id, target_url)
-                ttl = (resolved.ttl_seconds or DEFAULT_TTL) * TTL_FACTOR
+                raw = resolved.ttl_seconds
+                if raw is None:
+                    ttl = DEFAULT_TTL * TTL_FACTOR
+                elif raw > 0:
+                    ttl = raw * TTL_FACTOR
+                else:
+                    ttl = 0.0  # already-expired token → don't serve stale, re-resolve
                 entry = _Entry(resolved, thash, now + ttl)
             except Exception:
                 entry = _Entry(None, thash, now + NEGATIVE_TTL)
@@ -72,5 +78,6 @@ class ResolveCache:
                 self._data[entry_id] = entry
                 self._data.move_to_end(entry_id)
                 while len(self._data) > self._cap:
-                    self._data.popitem(last=False)
+                    old_id, _ = self._data.popitem(last=False)
+                    self._locks.pop(old_id, None)  # bound _locks alongside _data
             return entry.resolved
