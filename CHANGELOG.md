@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.1.1](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.1.0...v2.1.1) (2026-06-21)
+
+### Code Refactoring
+
+* **scraper:** drop the redundant category from the cam-name location suffix ([#73](https://github.com/mrgeetv/live-webcam-aggregator/issues/73)) ([4ac5a0c](https://github.com/mrgeetv/live-webcam-aggregator/commit/4ac5a0c002fb40cb9c5220d06f2cdcac5c2fdbfa))
+
 ## [2.1.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.0.2...v2.1.0) (2026-06-21)
 
 ### Features
