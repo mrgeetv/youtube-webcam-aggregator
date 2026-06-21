@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.3.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.2.1...v2.3.0) (2026-06-21)
+
+### Features
+
+* **scraper:** add SkylineWebcams source (own HLS + curated YouTube) ([#78](https://github.com/mrgeetv/live-webcam-aggregator/issues/78)) ([1c5a06e](https://github.com/mrgeetv/live-webcam-aggregator/commit/1c5a06ee6958c5ea0d72a03be1ed269bc90a3dac))
+
 ## [2.2.1](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.2.0...v2.2.1) (2026-06-21)
 
 ### Performance Improvements
