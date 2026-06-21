@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.1.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.0.2...v2.1.0) (2026-06-21)
+
+### Features
+
+* **scraper:** per-cam names on worldcams multi-stream pages; proxy enhd.es segments ([#72](https://github.com/mrgeetv/live-webcam-aggregator/issues/72)) ([49cdf95](https://github.com/mrgeetv/live-webcam-aggregator/commit/49cdf95cd19cc6f778961cee24a46564c299286f))
+
 ## [2.0.2](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.0.1...v2.0.2) (2026-06-20)
 
 ### Code Refactoring
