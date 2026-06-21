@@ -18,6 +18,9 @@ log = logging.getLogger("webcam-aggregator.fetch")
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
 MAX_BYTES = 8 * 1024 * 1024  # 8 MB ceiling for any fetched document
+MANIFEST_MAX_BYTES = (
+    32 * 1024 * 1024
+)  # 32 MB — DVR HLS playlists carry a huge back-catalogue
 SEGMENT_MAX_BYTES = 16 * 1024 * 1024  # 16 MB ceiling for a proxied media segment
 _MAX_REDIRECTS = 5
 
@@ -170,10 +173,14 @@ class Fetcher:
     _session: requests.Session
     _delay: float
     _retries: int
+    _byte_cap: int
 
-    def __init__(self, delay: float = 1.0, retries: int = 3) -> None:
+    def __init__(
+        self, delay: float = 1.0, retries: int = 3, byte_cap: int = MAX_BYTES
+    ) -> None:
         self._delay = delay
         self._retries = retries
+        self._byte_cap = byte_cap
         self._session = requests.Session()
         self._session.headers["User-Agent"] = UA
 
@@ -216,7 +223,7 @@ class Fetcher:
                 total = 0
                 for chunk in resp.iter_content(8192):
                     total += len(chunk)
-                    if total > MAX_BYTES:
+                    if total > self._byte_cap:
                         resp.close()
                         return None  # oversized → refuse
                     chunks.append(chunk)

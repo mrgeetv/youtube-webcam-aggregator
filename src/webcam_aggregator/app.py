@@ -21,7 +21,7 @@ from .extractors.direct_hls import DirectHls
 from .extractors.ipcamlive import IpcamliveResolver
 from .extractors.metatag import MetaTagExtractor
 from .extractors.ytdlp import YtDlpExtractor
-from .fetch import Fetcher, FetcherPostProtocol
+from .fetch import MANIFEST_MAX_BYTES, Fetcher, FetcherPostProtocol
 from .models import Candidate, CatalogueEntry
 from .registry import Registry
 from .serving import render_playlist, serve_child_manifest, serve_segment, serve_stream
@@ -389,7 +389,7 @@ def main() -> None:
     )
     store, cache, rebuild_once, source_counts = build_app(cfg)
 
-    manifest_fetcher = Fetcher(delay=0.0, retries=1)
+    manifest_fetcher = Fetcher(delay=0.0, retries=1, byte_cap=MANIFEST_MAX_BYTES)
     handler_cls = make_handler(
         store,
         cache,

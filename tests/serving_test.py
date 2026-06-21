@@ -11,6 +11,7 @@ from webcam_aggregator.serving import (
     serve_segment,
     serve_stream,
     serve_child_manifest,
+    truncate_to_live_edge,
 )
 from webcam_aggregator.signing import sign
 
@@ -567,3 +568,59 @@ def test_rewrite_manifest_offsite_ref_passed_through_not_proxied() -> None:
     assert "https://evil.example/inject.m3u8" in out  # passed through verbatim
     assert quote("https://evil.example/inject.m3u8", safe="") not in out  # not signed
     assert f"{BASE}/stream/{ENTRY_ID}/m?u=" in out  # same-site child IS proxied
+
+
+# ---------------------------------------------------------------------------
+# DVR live-edge truncation
+# ---------------------------------------------------------------------------
+
+
+def _dvr_playlist(n: int, target: int = 1, media_seq: int = 1000) -> str:
+    head = (
+        "#EXTM3U\n#EXT-X-VERSION:3\n"
+        f"#EXT-X-TARGETDURATION:{target}\n"
+        f"#EXT-X-MEDIA-SEQUENCE:{media_seq}\n"
+        "#EXT-X-DISCONTINUITY-SEQUENCE:5\n"
+    )
+    segs = "".join(f"#EXTINF:{target}.0,\nhttps://cdn.x/seg_{i}.ts\n" for i in range(n))
+    return head + segs
+
+
+def test_truncate_dvr_keeps_live_edge() -> None:
+    out = truncate_to_live_edge(
+        _dvr_playlist(300, target=1, media_seq=1000), window=120.0
+    )
+    segs = [ln for ln in out.splitlines() if ln.endswith(".ts")]
+    assert len(segs) == 120  # 120s window of 1s segments
+    assert segs[-1] == "https://cdn.x/seg_299.ts"  # live edge kept
+    assert segs[0] == "https://cdn.x/seg_180.ts"  # rewind buffer dropped
+    assert "seg_179.ts" not in out
+    assert "#EXT-X-MEDIA-SEQUENCE:1180" in out  # advanced by the 180 dropped
+
+
+def test_truncate_short_playlist_unchanged() -> None:
+    pl = _dvr_playlist(50, target=5)  # under the DVR threshold
+    assert truncate_to_live_edge(pl) == pl  # returned verbatim
+
+
+def test_truncate_master_unchanged() -> None:
+    master = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1\nhttps://cdn.x/v.m3u8\n"
+    assert truncate_to_live_edge(master) == master
+
+
+def test_serve_stream_truncates_dvr() -> None:
+    resolved = Resolved(
+        url="https://cdn.x/index.m3u8", stream_type="hls", ttl_seconds=60
+    )
+    cache = _make_cache(resolved)
+    entry = _entry(target_url="https://cdn.x/cam")
+    status, _ct, body = serve_stream(
+        ENTRY_ID,
+        catalogue={ENTRY_ID: entry},
+        cache=cache,
+        fetch=lambda _u: _dvr_playlist(500, target=1),
+        base_url=BASE,
+    )
+    assert status == 200
+    segs = [ln for ln in body.decode().splitlines() if ln.endswith(".ts")]
+    assert len(segs) == 120  # truncated from 500 to the live edge
