@@ -30,7 +30,7 @@ def _is_direct_playback(url: str) -> bool:
 # balticlivecam's token is IP-bound to OUR fetch; enhd.es 403s when the player
 # re-encodes the literal "+" in its stream path to %2B. Fetching the segment
 # server-side and handing the player a clean /s URL sidesteps both.
-_PROXY_SEGMENT_HOSTS = ("balticlivecam.com", "enhd.es")
+_PROXY_SEGMENT_HOSTS = ("balticlivecam.com", "enhd.es", "skylinewebcams.com")
 
 
 def _proxy_segments_for(url: str) -> bool:

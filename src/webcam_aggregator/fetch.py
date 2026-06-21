@@ -12,6 +12,7 @@ from typing import Any, Protocol, TypeVar
 from urllib.parse import urlencode, urljoin, urlsplit
 
 import requests
+from requests.adapters import HTTPAdapter
 
 log = logging.getLogger("webcam-aggregator.fetch")
 
@@ -183,6 +184,13 @@ class Fetcher:
         self._byte_cap = byte_cap
         self._session = requests.Session()
         self._session.headers["User-Agent"] = UA
+        # Size the connection pool to the worker count so concurrent fetches to one host
+        # reuse connections instead of churning (urllib3 "Connection pool is full").
+        adapter = HTTPAdapter(
+            pool_connections=SCRAPE_WORKERS, pool_maxsize=SCRAPE_WORKERS
+        )
+        self._session.mount("https://", adapter)
+        self._session.mount("http://", adapter)
 
     def get(self, url: str, timeout: float = 20.0) -> str | None:
         for attempt in range(self._retries):

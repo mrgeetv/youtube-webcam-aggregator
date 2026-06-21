@@ -27,8 +27,8 @@ The app is two phases, decoupled by a catalogue snapshot:
    through `/stream/<id>/m?u=…&sig=…`. Segments go **direct to the CDN by default**,
    with two per-host exceptions (their tokens are IP-bound to the fetcher):
    `_DIRECT_PLAYBACK_HOSTS` (pixelcaster) get a **302 passthrough** so the player
-   fetches the whole chain itself; `_PROXY_SEGMENT_HOSTS` (balticlivecam) get their
-   **segments relayed** through `/stream/<id>/s?u=…&sig=…`.
+   fetches the whole chain itself; `_PROXY_SEGMENT_HOSTS` (balticlivecam, skylinewebcams)
+   get their **segments relayed** through `/stream/<id>/s?u=…&sig=…`.
    **YouTube cams 302-redirect straight to googlevideo by default** (`PROXY_YOUTUBE`
    off): lower latency / less buffering on shallow live windows, but playback stops
    when the ~6h googlevideo token expires. `PROXY_YOUTUBE=true` proxies them like the
@@ -43,6 +43,8 @@ The app is two phases, decoupled by a catalogue snapshot:
   (`sources/base.py`) and implement three hooks — `_page_urls()` (the cam detail-page
   URLs), `_page_meta(html, url)` (per-page `(category, ctx)`), and `_title_for(cand,
   url, category, ctx)` — the base owns the concurrent fetch + the extraction ladder.
+  Override `_candidates(html, url)` too when a site's embeds aren't in the standard
+  ladder (e.g. Skyline's Clappr token / a `videoId` JS var → a page or watch URL).
   Add the instance to `active_sources` in `build_app`. Set `Candidate.predisc_key` so
   dedup can merge it (`yt:<id>` for YouTube, `hls:<normalised>` for direct m3u8,
   `None` = never merged).
@@ -81,6 +83,14 @@ The app is two phases, decoupled by a catalogue snapshot:
   reports a huge `totalResults` but returns an empty page 3). `discover()` paginates
   by `publishedBefore` time-windows instead (walking back from the last item's
   `publishedAt`) to reach the deeper hundreds; `pageToken` silently caps you at ~100.
+- Skyline cam pages carry NO per-cam category — it lives only in which category page
+  lists the cam, so `SkylineSource` crawls the category pages for `cam -> category`
+  then BFS's country/region pages for the rest (uncategorised -> "Other"). Two embed
+  types: own Clappr HLS (`source:'livee.m3u8?a=<token>'`, token regenerated per
+  page-load so `SkylineResolver` re-resolves the page at serve-time to
+  `hd-auth.skylinewebcams.com`) and "from the web" YouTube (`videoId:'…'` → watch URL,
+  dedups via `yt:`). Names come from the **breadcrumb** (English geo), not the URL path
+  (native: italia/espana).
 
 **Security model:** every outbound fetch is validated by `fetch._resolve_validated_ip`
 (rejects non-http(s) and private/loopback/link-local/reserved IPs), an 8 MB cap, and
