@@ -10,7 +10,16 @@ class _Stub:
 
 
 _EXTRACTORS: dict[str, Extractor] = {
-    n: _Stub() for n in ("ytdlp", "direct", "metatag", "baltic", "ipcamlive", "skyline")
+    n: _Stub()
+    for n in (
+        "ytdlp",
+        "direct",
+        "metatag",
+        "baltic",
+        "ipcamlive",
+        "skyline",
+        "earthcam",
+    )
 }
 
 
@@ -29,6 +38,8 @@ def test_real_registry_predicates():
         _route("https://www.skylinewebcams.com/en/webcam/italia/x/cam.html")
         == "skyline"
     )
+    assert _route("https://www.earthcam.com/usa/x/?cam=y") == "earthcam"
+    assert _route("https://www.twitch.tv/somechannel") == "ytdlp"
     assert _route("https://www.youtube.com/watch?v=aaaaaaaaaaa") == "ytdlp"
     assert _route("https://worldcams.tv/player?url=https://x/p.m3u8") == "direct"
     assert _route("https://example.com/page") is None

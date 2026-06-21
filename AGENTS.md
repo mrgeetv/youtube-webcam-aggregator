@@ -27,7 +27,7 @@ The app is two phases, decoupled by a catalogue snapshot:
    through `/stream/<id>/m?u=…&sig=…`. Segments go **direct to the CDN by default**,
    with two per-host exceptions (their tokens are IP-bound to the fetcher):
    `_DIRECT_PLAYBACK_HOSTS` (pixelcaster) get a **302 passthrough** so the player
-   fetches the whole chain itself; `_PROXY_SEGMENT_HOSTS` (balticlivecam, skylinewebcams)
+   fetches the whole chain itself; `_PROXY_SEGMENT_HOSTS` (balticlivecam, skylinewebcams, earthcam)
    get their **segments relayed** through `/stream/<id>/s?u=…&sig=…`.
    **YouTube cams 302-redirect straight to googlevideo by default** (`PROXY_YOUTUBE`
    off): lower latency / less buffering on shallow live windows, but playback stops
@@ -91,6 +91,15 @@ The app is two phases, decoupled by a catalogue snapshot:
   `hd-auth.skylinewebcams.com`) and "from the web" YouTube (`videoId:'…'` → watch URL,
   dedups via `yt:`). Names come from the **breadcrumb** (English geo), not the URL path
   (native: italia/espana).
+- camscape aggregates from many providers — the cam page's `"streams":[{…}]` JSON is the
+  source of truth (the rendered iframe shows only the active angle), one candidate per
+  stream `url`. Most route to existing extractors (YouTube, ipcamlive, m3u8, feratel);
+  plus a bespoke `earthcam` extractor (fetch page → grab its `.m3u8`; EarthCam 403s
+  without a Referer, see `_REFERER_HOSTS` in `fetch.py`) and a twitch normalise
+  (`player.twitch.tv/?channel=X` → `twitch.tv/X` → yt-dlp). ivideon (WebRTC), rtsp.me
+  (server fetch gets only stub manifests, segments 404) + angelcam (auth) are
+  unservable, dropped. Category + location come from the cam page's
+  `/showing/<cat>` + `/location/<loc>` tags.
 
 **Security model:** every outbound fetch is validated by `fetch._resolve_validated_ip`
 (rejects non-http(s) and private/loopback/link-local/reserved IPs), an 8 MB cap, and

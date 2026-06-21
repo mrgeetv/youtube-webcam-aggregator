@@ -170,6 +170,18 @@ class FetcherPostProtocol(Protocol):
     ) -> str | None: ...
 
 
+# Hosts whose HLS manifest + segments 403 without a Referer (their CDN gates on it).
+_REFERER_HOSTS: dict[str, str] = {"earthcam.com": "https://www.earthcam.com/"}
+
+
+def _referer_for(url: str) -> dict[str, str]:
+    host = urlsplit(url).hostname or ""
+    for h, ref in _REFERER_HOSTS.items():
+        if host == h or host.endswith("." + h):
+            return {"Referer": ref}
+    return {}
+
+
 class Fetcher:
     _session: requests.Session
     _delay: float
@@ -217,7 +229,11 @@ class Fetcher:
             # Fresh per-call session pinned to the validated IP (thread-safe).
             with _PinDNS(host, ip):
                 resp = self._session.get(
-                    current, timeout=timeout, stream=True, allow_redirects=False
+                    current,
+                    timeout=timeout,
+                    stream=True,
+                    allow_redirects=False,
+                    headers=_referer_for(current),
                 )
                 if resp.is_redirect or resp.is_permanent_redirect:
                     location = resp.headers.get("Location")
@@ -247,6 +263,7 @@ class Fetcher:
             return None
         host = urlsplit(url).hostname or ""
         headers = {"Range": range_header} if range_header else {}
+        headers.update(_referer_for(url))
         try:
             with _PinDNS(host, ip):
                 resp = self._session.get(

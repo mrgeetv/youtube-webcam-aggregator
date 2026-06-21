@@ -165,11 +165,13 @@ live-webcam-aggregator/
 │       │   ├── metatag.py      # HTML meta-tag extractor
 │       │   ├── baltic.py       # Baltic Live cam extractor
 │       │   ├── ipcamlive.py    # IPCamLive extractor
+│       │   ├── earthcam.py     # EarthCam extractor (page -> HLS)
 │       │   └── skyline.py      # SkylineWebcams extractor (cam page -> hd-auth HLS)
 │       └── sources/            # Stream discovery sources
 │           ├── youtube_api.py  # YouTube Data API v3 source
 │           ├── worldcams.py    # Worldcams.net scraper source
 │           ├── cxtvlive.py     # CXTV Live scraper source
+│           ├── camscape.py     # Camscape aggregator scraper source
 │           └── skyline.py      # SkylineWebcams scraper source
 ├── scripts/                    # Helper scripts
 │   ├── run.sh                  # Docker build/run script
