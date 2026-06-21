@@ -33,6 +33,7 @@ class Config:
     search_query: str
     log_level: str
     exclude_categories: frozenset[str]
+    proxy_youtube: bool
 
 
 def _int_env(env: dict[str, str], key: str, default: int, minimum: int) -> int:
@@ -49,6 +50,21 @@ def _int_env(env: dict[str, str], key: str, default: int, minimum: int) -> int:
 def _csv_set(raw: str) -> frozenset[str]:
     # Comma-separated, stored casefolded so category matching is case-insensitive.
     return frozenset(p.strip().casefold() for p in raw.split(",") if p.strip())
+
+
+def _bool_env(env: dict[str, str], key: str, default: bool) -> bool:
+    raw = env.get(key)
+    if raw is None:
+        return default
+    v = raw.strip().lower()
+    if v in ("true", "1"):
+        return True
+    if v in ("false", "0", ""):
+        return False
+    log.warning(
+        "invalid %s=%r — expected true/false; using default %s", key, raw, default
+    )
+    return default
 
 
 def _warn_on_suspect_config(cfg: Config) -> None:
@@ -93,6 +109,7 @@ def load(env: dict[str, str] | None = None) -> Config:
         search_query=e.get("SEARCH_QUERY", "").strip() or _DEFAULT_SEARCH_QUERY,
         log_level=e.get("LOG_LEVEL", "INFO").strip().upper() or "INFO",
         exclude_categories=_csv_set(e.get("EXCLUDE_CATEGORIES", "")),
+        proxy_youtube=_bool_env(e, "PROXY_YOUTUBE", False),
     )
     _warn_on_suspect_config(cfg)
     _warn_legacy_env(e)

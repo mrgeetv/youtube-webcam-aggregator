@@ -26,6 +26,12 @@ The app is two phases, decoupled by a catalogue snapshot:
    `_DIRECT_PLAYBACK_HOSTS` (pixelcaster) get a **302 passthrough** so the player
    fetches the whole chain itself; `_PROXY_SEGMENT_HOSTS` (balticlivecam) get their
    **segments relayed** through `/stream/<id>/s?u=…&sig=…`.
+   **YouTube cams 302-redirect straight to googlevideo by default** (`PROXY_YOUTUBE`
+   off): lower latency / less buffering on shallow live windows, but playback stops
+   when the ~6h googlevideo token expires. `PROXY_YOUTUBE=true` proxies them like the
+   rest (survives expiry via re-resolve), and proxied **DVR** playlists are trimmed to
+   the live edge (`truncate_to_live_edge`) so we never relay the multi-MB rewind
+   buffer (the manifest fetcher uses `MANIFEST_MAX_BYTES`, not the 8 MB default).
 
 **`build_app()` in `app.py` is the wiring seam.** To extend:
 
@@ -45,6 +51,12 @@ The app is two phases, decoupled by a catalogue snapshot:
   maps to the unified taxonomy or "Other". `EXCLUDE_CATEGORIES` (config) post-filters
   the built catalogue by mapped category, across all sources. The full excludable set
   is `categories.ALL_CATEGORIES` — a test guards that the README list matches it.
+- **Add a config/env var** — parse it in `config.py` via the `_*_env` helpers, and
+  ALWAYS validate: a bad/unparseable value must log a `WARNING` at startup and fall
+  back to the default, never crash or silently misbehave (e.g. `_int_env` warns on a
+  bad int, `_bool_env` on a non-`true`/`false`; `_warn_on_suspect_config` flags
+  dubious-but-valid values). Document every new var in README + DEVELOPMENT +
+  `.env.example`.
 
 **Hard-won lessons (don't relearn these):**
 

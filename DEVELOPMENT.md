@@ -51,6 +51,7 @@ Configure these in your `.env` file or pass directly to docker-compose:
 | `EXCLUDE_CATEGORIES` | (none) | Comma-separated categories to drop across all sources (case-insensitive) |
 | `LOG_LEVEL` | `INFO` | Logging verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `SCRAPE_WORKERS` | `min(16, cpu×4)` | Concurrency for scraping + liveness during the catalogue build |
+| `PROXY_YOUTUBE` | `false` | `true` proxies YouTube through the server (survives the ~6h token expiry, trims DVR to the live edge); `false` (default) redirects players direct to YouTube (lower latency, stops at token expiry) |
 
 ### Using the Run Script
 
@@ -206,9 +207,9 @@ liveness-probe failures. Live process memory (`rss_mb`) and per-source counts ar
 exposed on the `/health` endpoint.
 
 Suspect config logs a `WARNING` at startup rather than failing silently: a non-numeric
-`CATALOGUE_INTERVAL_HOURS`/`SCRAPE_WORKERS`, an unknown `LOG_LEVEL`, a
-`localhost` `PUBLIC_BASE_URL` (unreachable by remote players), or an unknown name in
-`EXCLUDE_CATEGORIES`.
+`CATALOGUE_INTERVAL_HOURS`/`SCRAPE_WORKERS`, a non-`true`/`false` `PROXY_YOUTUBE`, an
+unknown `LOG_LEVEL`, a `localhost` `PUBLIC_BASE_URL` (unreachable by remote players),
+or an unknown name in `EXCLUDE_CATEGORIES`.
 
 Memory peaks **during** the catalogue build (it fetches + liveness-checks every
 source concurrently) and settles back down once the playlist is built. The build is

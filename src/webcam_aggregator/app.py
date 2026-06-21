@@ -162,6 +162,7 @@ def make_handler(
     segment_fetch: Callable[
         [str, str | None], tuple[int, str, str | None, bytes] | None
     ],
+    proxy_youtube: bool = False,
 ) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
@@ -237,6 +238,7 @@ def make_handler(
                     cache=cache,
                     fetch=manifest_fetch,
                     base_url=base_url,
+                    proxy_youtube=proxy_youtube,
                 )
                 if status == 302:
                     self.send_response(302)
@@ -397,6 +399,7 @@ def main() -> None:
         manifest_fetch=manifest_fetcher.get,
         source_counts=source_counts,
         segment_fetch=manifest_fetcher.get_segment,
+        proxy_youtube=cfg.proxy_youtube,
     )
     run_http_server(handler_cls)
 

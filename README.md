@@ -128,6 +128,7 @@ All via environment variables (see `.env.example`):
 | `EXCLUDE_CATEGORIES` | (none) | Comma-separated categories to drop, across all sources, case-insensitive. See *Filtering by category* |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `SCRAPE_WORKERS` | `min(16, cpu×4)` | Concurrency for scraping + liveness during the catalogue build. Lower it to reduce peak build-time memory (at the cost of a slower build) |
+| `PROXY_YOUTUBE` | `false` | `false` redirects players straight to YouTube (lower latency, but playback stops when YouTube's ~6h stream token expires — reselect to resume). `true` proxies YouTube through the server so it keeps playing past that, at a small latency cost |
 
 > **Resource usage:** memory peaks during the periodic catalogue build (it fetches
 > and liveness-checks every source concurrently), then settles back down once the
