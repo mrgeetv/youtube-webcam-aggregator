@@ -79,6 +79,7 @@ _MULTI_LIST = (
 )
 _MULTI_CAM = (
     "<h1>Gran Canaria Beaches Webcam</h1>"
+    'Category: &nbsp;<a href="/beaches/">Beaches</a>'
     '<a class="streams__item active" id="streams__item_0" href="#"'
     ' onClick="SetStream(0,1); return false;">Playa del Inglés</a>'
     '<a class="streams__item" id="streams__item_1378" href="#"'
@@ -98,7 +99,8 @@ def test_multi_stream_page_uses_per_cam_names() -> None:
     }
     cands = list(WorldcamsSource(fetch=_FakeFetcher(pages)).discover())
     titles = {c.title for c in cands}
-    assert "Playa del Inglés — Beaches, Gran Canaria, Spain" in titles
-    assert "Maspalomas Beach — Beaches, Gran Canaria, Spain" in titles
+    # category ("Beaches") is dropped from the suffix (shown as the group)
+    assert "Playa del Inglés — Gran Canaria, Spain" in titles
+    assert "Maspalomas Beach — Gran Canaria, Spain" in titles
     # keyed by the worldcams stream-id → distinct, reorder-stable /stream ids
     assert {c.angle_key for c in cands} == {"0", "1378"}

@@ -32,9 +32,11 @@ class CxtvliveSource:
                 continue
             tm = _TITLE.search(html)
             cm = _CATEGORY.search(html)
-            title = with_location(
-                tm.group(1).strip() if tm else slug.replace("-", " ").title(), url
-            )
             category = cm.group(1).replace("-", " ").title() if cm else None
+            title = with_location(
+                tm.group(1).strip() if tm else slug.replace("-", " ").title(),
+                url,
+                drop=category or "",
+            )
             for c in extract_candidates(html, page_url=url, source="cxtvlive"):
                 yield replace(c, title=title, category=category)

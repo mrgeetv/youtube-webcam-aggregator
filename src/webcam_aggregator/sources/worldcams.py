@@ -49,5 +49,5 @@ class WorldcamsSource:
             names = {sid: name.strip() for sid, name in _STREAM_NAMES.findall(html)}
             for c in extract_candidates(html, page_url=url, source="worldcams"):
                 specific = names.get(c.angle_key or "", "")
-                title = with_location(specific or page_title, url)
+                title = with_location(specific or page_title, url, drop=category or "")
                 yield replace(c, title=title, category=category)

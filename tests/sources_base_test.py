@@ -55,6 +55,21 @@ def test_with_location_appends_only_new_parts():
     )
 
 
+def test_with_location_drops_category_from_suffix():
+    wc = "https://worldcams.tv"
+    url = f"{wc}/spain/gran-canaria/beaches"
+    # the category is shown as the group, so keep it out of the suffix
+    assert (
+        with_location("Playa del Inglés", url, drop="Beaches")
+        == "Playa del Inglés — Gran Canaria, Spain"
+    )
+    # a drop value not present in the path leaves the suffix unchanged
+    assert (
+        with_location("Maspalomas Beach", url, drop="Webcams")
+        == "Maspalomas Beach — Beaches, Gran Canaria, Spain"
+    )
+
+
 def test_ignores_source_attribution_link():
     html = '<div class="player"></div> Source: <a href="https://www.youtube.com/@SlowTVLive">x</a>'
     cands = list(

@@ -84,18 +84,23 @@ def location_from_url(page_url: str) -> str:
     return ", ".join(reversed(_location_parts(page_url)))
 
 
-def with_location(title: str, page_url: str) -> str:
+def with_location(title: str, page_url: str, *, drop: str = "") -> str:
     """Append the URL location segments the title doesn't already name.
 
     worldcams h1s usually already include the place, so we only add what's new
     (e.g. the country) — avoiding "Dusseldorf Airport — Dusseldorf, Germany" — while
-    still distinguishing generic titles ("Italy Beaches — Cinque Terre").
+    still distinguishing generic titles ("Italy Beaches — Cinque Terre"). `drop` is
+    the cam's category: players show it as the group, so we keep it out of the suffix
+    too (no "Playa del Inglés — Beaches, Gran Canaria, Spain").
     """
     parts = _location_parts(page_url)
     if not title.strip():
         return location_from_url(page_url) or title
     nt = _norm(title)
-    extra = [p for p in reversed(parts) if _norm(p) and _norm(p) not in nt]
+    dn = _norm(drop)
+    extra = [
+        p for p in reversed(parts) if _norm(p) and _norm(p) not in nt and _norm(p) != dn
+    ]
     return f"{title} — {', '.join(extra)}" if extra else title
 
 
