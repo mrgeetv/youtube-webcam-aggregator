@@ -181,10 +181,12 @@ Airports, Animals, Aquariums, Bars & Nightlife, Beaches, Cities, Education,
 Entertainment, Hotels, Landmarks, Mountains, Music, Nature & Parks, News & Politics,
 Nonprofits & Activism, Other, People & Blogs, Ports & Ships, Religion,
 Science & Technology, Seasonal, Space, Sports, Studios, Traffic, Trains & Railways,
-Travel & Events, Water & Waterways
+Travel & Events, Unmapped Category, Water & Waterways, Weather
 ```
 
-`Other` catches anything that didn't map to a known category.
+`Other` is for cams a source left uncategorised. `Unmapped Category` is different — it
+flags cams whose source *did* give a category we don't recognise yet, so a missing
+mapping is visible (and logged at build) instead of hidden in `Other`.
 
 ## Upgrading from v1
 

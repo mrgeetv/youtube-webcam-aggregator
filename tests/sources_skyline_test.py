@@ -1,3 +1,5 @@
+import pytest
+
 from webcam_aggregator.sources.skyline import SkylineSource
 
 _BASE = "https://www.skylinewebcams.com"
@@ -84,3 +86,25 @@ def test_skyline_discover_follows_country_then_region_uncategorised():
     by_page = {c.source_page_url: c for c in cands}
     assert f"{_BASE}/{cam}" in by_page  # reached via country -> region BFS
     assert by_page[f"{_BASE}/{cam}"].category is None  # never categorised -> "Other"
+
+
+def test_skyline_index_crawl_flags_unmapped_category(caplog: pytest.LogCaptureFixture):
+    import logging
+
+    # the index lists a known category (beach) AND a new one we don't map (drones);
+    # the new category's cam carries the raw slug -> map_category -> "Unmapped Category".
+    cam = "en/webcam/x/drone-cam.html"
+    pages = {
+        f"{_BASE}/en/live-cams.html": (
+            '<a href="/en/live-cams-category/beach-cams.html">Beaches</a>'
+            '<a href="/en/live-cams-category/drones-cams.html">Drones</a>'
+        ),
+        f"{_BASE}/en/live-cams-category/beach-cams.html": "",
+        f"{_BASE}/en/live-cams-category/drones-cams.html": f'<a href="{cam}"></a>',
+        f"{_BASE}/{cam}": _OWN_PAGE,
+    }
+    with caplog.at_level(logging.WARNING, logger="webcam-aggregator.skyline"):
+        cands = list(SkylineSource(_FakeFetch(pages)).discover())
+    by_page = {c.source_page_url: c for c in cands}
+    assert by_page[f"{_BASE}/{cam}"].category == "drones"
+    assert any("drones" in r.getMessage() for r in caplog.records)
