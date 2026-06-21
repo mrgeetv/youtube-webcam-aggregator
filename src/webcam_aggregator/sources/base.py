@@ -15,7 +15,7 @@ _YT_CHANNEL = re.compile(
     r"youtube\.com/(channel/[A-Za-z0-9_-]+|@[A-Za-z0-9_.-]+)(?:/live)?"
 )
 _M3U8 = re.compile(r"https?:[\\/]+[^\"'\s\\]+\.m3u8[^\"'\s\\]*")
-_WC_STREAMS = re.compile(r'streams\[\d+\]\s*=\s*"((?:[^"\\]|\\.)*)"')
+_WC_STREAMS = re.compile(r"""streams\[(\d+)\]\s*=\s*(["'])((?:\\.|(?!\2).)*)\2""")
 _WC_PLAYER = re.compile(r"worldcams\.tv\\?/player\?url=([^\"'\s\\]+)")
 _IFRAME_SRC = re.compile(r'src=\\?"([^"\\]+)')
 _IFRAME_TAG = re.compile(r'<iframe[^>]+src=["\']([^"\']+)["\']', re.I)
@@ -35,12 +35,15 @@ def _strip_attribution(html: str) -> str:
     return _ATTRIBUTION_BLOCK.sub("", html)
 
 
-def _angle_targets(html: str) -> list[str]:
-    out: list[str] = []
-    for raw in _WC_STREAMS.findall(html):
+def _angle_targets(html: str) -> list[tuple[str | None, str]]:
+    # worldcams multi-cam pages store each embed as streams[<stream-id>] = '<iframe…>'
+    # (single OR double quoted). The stream-id is the join key to the per-cam name in
+    # the streams__item selector, so carry it through as the angle_key.
+    out: list[tuple[str | None, str]] = []
+    for sid, _quote, raw in _WC_STREAMS.findall(html):
         m = _IFRAME_SRC.search(raw)
         if m:
-            out.append(m.group(1))
+            out.append((sid, m.group(1)))
     return out
 
 
@@ -98,32 +101,36 @@ def with_location(title: str, page_url: str) -> str:
 
 def extract_candidates(html: str, *, page_url: str, source: str) -> Iterator[Candidate]:
     clean = _strip_attribution(html)
-    raw_targets = _angle_targets(clean)
-    if not raw_targets:
+    # Prefer the structured streams[<id>] = '<iframe…>' embeds (keyed by stream-id);
+    # fall back to a whole-page scan when a page has no such array.
+    pairs: list[tuple[str | None, str]] = _angle_targets(clean)
+    if not pairs:
+        plain: list[str] = []
         for m in _YT_VIDEO.finditer(clean):
-            raw_targets.append(f"https://www.youtube.com/watch?v={m.group(1)}")
+            plain.append(f"https://www.youtube.com/watch?v={m.group(1)}")
         for m in _YT_PLAYLIST.finditer(clean):
-            raw_targets.append(f"https://www.youtube.com/embed?list={m.group(1)}")
+            plain.append(f"https://www.youtube.com/embed?list={m.group(1)}")
         for pm in _WC_PLAYER.finditer(clean):
-            raw_targets.append("https://worldcams.tv/player?url=" + pm.group(1))
+            plain.append("https://worldcams.tv/player?url=" + pm.group(1))
         for mm in _M3U8.finditer(clean):
-            raw_targets.append(mm.group(0))
+            plain.append(mm.group(0))
         cm = _YT_CHANNEL.search(clean)
         if cm:
-            raw_targets.append("https://www.youtube.com/" + cm.group(1) + "/live")
-        if not raw_targets:
+            plain.append("https://www.youtube.com/" + cm.group(1) + "/live")
+        if not plain:
             ifr = _IFRAME_TAG.search(clean)
             if ifr:
-                raw_targets.append(ifr.group(1))
+                plain.append(ifr.group(1))
+        multi = len(plain) > 1
+        pairs = [(str(i) if multi else None, t) for i, t in enumerate(plain)]
     seen: set[str] = set()
-    multi = len(raw_targets) > 1
-    for idx, target in enumerate(raw_targets):
+    for key, target in pairs:
         if target in seen:
             continue
         seen.add(target)
         yield Candidate(
             title="",
-            angle_key=str(idx) if multi else None,
+            angle_key=key,
             category=None,
             source=source,
             source_page_url=page_url,

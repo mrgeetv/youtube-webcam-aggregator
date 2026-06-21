@@ -26,9 +26,11 @@ def _is_direct_playback(url: str) -> bool:
     return any(host == h or host.endswith("." + h) for h in _DIRECT_PLAYBACK_HOSTS)
 
 
-# Hosts whose segments are token/IP-bound to OUR fetch (e.g. baltic's auth token):
-# the player can't fetch them directly, so we relay the segment bytes too.
-_PROXY_SEGMENT_HOSTS = ("balticlivecam.com",)
+# Hosts whose segments fail a direct player fetch, so we relay the bytes too:
+# balticlivecam's token is IP-bound to OUR fetch; enhd.es 403s when the player
+# re-encodes the literal "+" in its stream path to %2B. Fetching the segment
+# server-side and handing the player a clean /s URL sidesteps both.
+_PROXY_SEGMENT_HOSTS = ("balticlivecam.com", "enhd.es")
 
 
 def _proxy_segments_for(url: str) -> bool:

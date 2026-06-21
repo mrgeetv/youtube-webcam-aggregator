@@ -465,6 +465,33 @@ def test_serve_stream_baltic_segments_proxied_via_s() -> None:
     assert expected_prefix in text
 
 
+def test_serve_stream_enhd_es_segments_proxied_via_s() -> None:
+    """enhd.es resolves fine server-side but 403s the player's '+'-re-encoded
+    segment fetch, so its segments must be relayed through /s."""
+    enhd_url = "https://stream.enhd.es/live/+Cam.stream/chunklist.m3u8"
+    manifest = (
+        "#EXTM3U\n#EXT-X-VERSION:3\n#EXTINF:10.0,\n"
+        "https://stream.enhd.es/live/+Cam.stream/media_1.ts\n"
+    )
+    resolved = Resolved(url=enhd_url, stream_type="hls", ttl_seconds=60)
+    cache = _make_cache(resolved)
+    entry = _entry(target_url="https://en.in2thebeach.es/cam")
+
+    status, _ct, body = serve_stream(
+        ENTRY_ID,
+        catalogue={ENTRY_ID: entry},
+        cache=cache,
+        fetch=lambda u: manifest,
+        base_url=BASE,
+    )
+    assert status == 200
+    absolute_seg = "https://stream.enhd.es/live/+Cam.stream/media_1.ts"
+    expected_prefix = (
+        f"{BASE}/stream/{ENTRY_ID}/s?u={quote(absolute_seg, safe='')}&sig="
+    )
+    assert expected_prefix in body.decode()
+
+
 # ---------------------------------------------------------------------------
 # 9. serve_segment
 # ---------------------------------------------------------------------------
