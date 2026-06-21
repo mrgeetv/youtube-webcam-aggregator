@@ -50,7 +50,7 @@ def _angle_targets(html: str) -> list[tuple[str | None, str]]:
     return out
 
 
-def _predisc_key(target: str) -> str | None:
+def predisc_key(target: str) -> str | None:
     t = (
         unquote(re.sub(r"^https?:.*?url=", "", target))
         if "player?url=" in target
@@ -149,7 +149,7 @@ def extract_candidates(html: str, *, page_url: str, source: str) -> Iterator[Can
             source=source,
             source_page_url=page_url,
             target_url=target,
-            predisc_key=_predisc_key(target),
+            predisc_key=predisc_key(target),
         )
 
 

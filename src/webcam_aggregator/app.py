@@ -18,6 +18,7 @@ from .catalogue import Hist, build_catalogue
 from .extractors.base import Extractor, Resolved
 from .extractors.baltic import BalticResolver
 from .extractors.direct_hls import DirectHls
+from .extractors.earthcam import EarthcamResolver
 from .extractors.ipcamlive import IpcamliveResolver
 from .extractors.metatag import MetaTagExtractor
 from .extractors.skyline import SkylineResolver
@@ -26,6 +27,7 @@ from .fetch import MANIFEST_MAX_BYTES, Fetcher, FetcherPostProtocol
 from .models import Candidate, CatalogueEntry
 from .registry import Registry
 from .serving import render_playlist, serve_child_manifest, serve_segment, serve_stream
+from .sources.camscape import CamscapeSource
 from .sources.cxtvlive import CxtvliveSource
 from .sources.skyline import SkylineSource
 from .sources.worldcams import WorldcamsSource
@@ -95,6 +97,8 @@ def build_registry(extractors: dict[str, Extractor]) -> Registry:
         (lambda u: "ipcamlive.com/player/player.php" in u, "ipcamlive"),
         (lambda u: "webtv.feratel.com" in u, "metatag"),
         (lambda u: "skylinewebcams.com/en/webcam/" in u, "skyline"),
+        (lambda u: "earthcam." in u, "earthcam"),
+        (lambda u: "twitch.tv/" in u, "ytdlp"),
         (lambda u: _is_ytdlp(u), "ytdlp"),
         (lambda u: ".m3u8" in u or "worldcams.tv/player?url=" in u, "direct"),
     ]
@@ -316,6 +320,7 @@ def build_app(
         "baltic": BalticResolver(rget, _baltic_post(resolver_fetcher)),
         "ipcamlive": IpcamliveResolver(rget),
         "skyline": SkylineResolver(rget),
+        "earthcam": EarthcamResolver(rget),
     }
     registry = build_registry(extractors)
     resolve = make_resolve(registry, extractors)
@@ -341,6 +346,7 @@ def build_app(
             WorldcamsSource(fetcher),
             CxtvliveSource(fetcher),
             SkylineSource(fetcher),
+            CamscapeSource(fetcher),
         )
         if s is not None
     ]

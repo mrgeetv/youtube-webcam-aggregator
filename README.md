@@ -12,10 +12,11 @@ stream is actually played.
 
 | Source | What it adds |
 | ------ | ------------ |
-| YouTube Data API | Live webcam broadcasts found by search |
-| worldcams.tv | Scraped camera directory |
+| camscape.com | Scraped camera directory |
 | cxtvlive.com | Scraped camera directory |
-| skylinewebcams.com | Scraped camera directory (own HLS cams + curated YouTube) |
+| skylinewebcams.com | Scraped camera directory |
+| worldcams.tv | Scraped camera directory |
+| YouTube Data API | Live webcam broadcasts found by search |
 
 The same camera found on more than one source is merged into a single channel.
 
