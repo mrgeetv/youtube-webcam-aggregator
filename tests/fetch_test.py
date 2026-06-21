@@ -356,6 +356,38 @@ def test_get_oversized_body_returns_none(monkeypatch: pytest.MonkeyPatch) -> Non
     assert f.get("https://cdn.example/big.m3u8") is None
 
 
+def test_get_respects_custom_byte_cap(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A raised byte_cap accepts a body the default cap would reject — so the manifest
+    fetcher can pull large DVR playlists."""
+    from webcam_aggregator.fetch import MAX_BYTES
+
+    monkeypatch.setattr(
+        "webcam_aggregator.fetch.socket.getaddrinfo",
+        lambda *_a, **_k: _mock_getaddrinfo("93.184.216.34"),
+    )
+    big = b"#EXTM3U\n" + b"x" * MAX_BYTES  # just over the default 8 MB ceiling
+
+    class _BigResp:
+        is_redirect: bool = False
+        is_permanent_redirect: bool = False
+
+        def raise_for_status(self) -> None: ...
+
+        def iter_content(self, _n: int) -> object:
+            return iter([big])
+
+        def close(self) -> None: ...
+
+    monkeypatch.setattr("requests.Session.get", lambda _self, _url, **_k: _BigResp())
+    assert Fetcher(delay=0.0, retries=1).get("https://cdn.x/big.m3u8") is None
+    assert (
+        Fetcher(delay=0.0, retries=1, byte_cap=MAX_BYTES * 4).get(
+            "https://cdn.x/big.m3u8"
+        )
+        is not None
+    )
+
+
 def test_get_segment_oversized_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
     """Segment exceeding SEGMENT_MAX_BYTES ceiling → get_segment returns None."""
     from webcam_aggregator.fetch import SEGMENT_MAX_BYTES
