@@ -29,6 +29,7 @@ def test_new_field_defaults():
     c = config.load({"YOUTUBE_API_KEY": "k"})
     assert c.search_query  # non-empty built-in default
     assert c.log_level == "INFO"
+    assert c.proxy_youtube is False
 
 
 def test_new_fields_from_env():
@@ -37,10 +38,12 @@ def test_new_fields_from_env():
             "YOUTUBE_API_KEY": "k",
             "SEARCH_QUERY": "trains|railway",
             "LOG_LEVEL": "debug",
+            "PROXY_YOUTUBE": "true",
         }
     )
     assert c.search_query == "trains|railway"
     assert c.log_level == "DEBUG"  # normalised to upper-case
+    assert c.proxy_youtube is True
 
 
 def test_exclude_categories_parsed_casefolded():
@@ -58,6 +61,13 @@ def test_bad_log_level_warns(caplog: pytest.LogCaptureFixture) -> None:
     with caplog.at_level(logging.WARNING, logger="webcam-aggregator.config"):
         config.load({"YOUTUBE_API_KEY": "k", "LOG_LEVEL": "VERBOSE"})
     assert "LOG_LEVEL" in caplog.text
+
+
+def test_bad_proxy_youtube_warns(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING, logger="webcam-aggregator.config"):
+        c = config.load({"YOUTUBE_API_KEY": "k", "PROXY_YOUTUBE": "maybe"})
+    assert "PROXY_YOUTUBE" in caplog.text
+    assert c.proxy_youtube is False  # bad value falls back to the default
 
 
 def test_localhost_public_base_url_warns(caplog: pytest.LogCaptureFixture) -> None:

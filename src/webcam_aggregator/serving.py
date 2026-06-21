@@ -38,6 +38,11 @@ def _proxy_segments_for(url: str) -> bool:
     return any(host == h or host.endswith("." + h) for h in _PROXY_SEGMENT_HOSTS)
 
 
+def _is_youtube(url: str) -> bool:
+    host = urlsplit(url).hostname or ""
+    return host == "googlevideo.com" or host.endswith(".googlevideo.com")
+
+
 def _registrable_domain(host: str) -> str:
     parts = host.lower().split(".")
     return ".".join(parts[-2:]) if len(parts) >= 2 else host.lower()
@@ -212,6 +217,7 @@ def serve_stream(
     cache: ResolveCache,
     fetch: Callable[[str], str | None],
     base_url: str,
+    proxy_youtube: bool = False,
 ) -> Response:
     entry = catalogue.get(entry_id)
     if entry is None:
@@ -224,6 +230,12 @@ def serve_stream(
         return (302, resolved.url, b"")  # redirect; 2nd field is the Location
     if _is_direct_playback(resolved.url):
         # IP-bound session: let the player fetch the whole chain itself (no proxy)
+        return (302, resolved.url, b"")
+    if _is_youtube(resolved.url) and not proxy_youtube:
+        # Default: hand the player the googlevideo manifest directly — lower latency
+        # and less buffering on shallow live windows. Trade-off: playback stops when
+        # the ~6h googlevideo token expires (re-select to resume). PROXY_YOUTUBE=true
+        # proxies instead — survives expiry via re-resolve, DVR trimmed to live edge.
         return (302, resolved.url, b"")
     manifest = fetch(resolved.url)
     if manifest is None:

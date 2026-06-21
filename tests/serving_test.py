@@ -203,7 +203,7 @@ def test_serve_stream_cache_miss_returns_502() -> None:
 def test_serve_stream_non_hls_manifest_returns_502() -> None:
     # a DASH .mpd / XML / error body must not be served as HLS
     resolved = Resolved(
-        url="https://x.googlevideo.com/manifest.mpd", stream_type="hls", ttl_seconds=60
+        url="https://x.example/manifest.mpd", stream_type="hls", ttl_seconds=60
     )
     cache = _make_cache(resolved)
     entry = _entry()
@@ -216,6 +216,36 @@ def test_serve_stream_non_hls_manifest_returns_502() -> None:
     )
     assert status == 502
     assert b"HLS" in body
+
+
+def test_serve_stream_youtube_redirects_when_not_proxied() -> None:
+    yt = "https://manifest.googlevideo.com/api/manifest/hls_playlist/x/index.m3u8"
+    cache = _make_cache(Resolved(url=yt, stream_type="hls", ttl_seconds=60))
+    status, loc, _ = serve_stream(
+        ENTRY_ID,
+        catalogue={ENTRY_ID: _entry()},
+        cache=cache,
+        fetch=lambda _u: "should-not-be-fetched",
+        base_url=BASE,
+    )  # proxy_youtube defaults to False → 302 direct, no fetch
+    assert status == 302
+    assert loc == yt
+
+
+def test_serve_stream_youtube_proxied_when_enabled() -> None:
+    yt = "https://manifest.googlevideo.com/api/manifest/hls_playlist/x/index.m3u8"
+    cache = _make_cache(Resolved(url=yt, stream_type="hls", ttl_seconds=60))
+    status, ct, body = serve_stream(
+        ENTRY_ID,
+        catalogue={ENTRY_ID: _entry()},
+        cache=cache,
+        fetch=lambda _u: "#EXTM3U\n#EXTINF:5.0,\nhttps://x.googlevideo.com/seg.ts\n",
+        base_url=BASE,
+        proxy_youtube=True,
+    )
+    assert status == 200
+    assert "mpegurl" in ct
+    assert "#EXTM3U" in body.decode()
 
 
 def test_serve_stream_hls_returns_200_rewritten_body() -> None:
