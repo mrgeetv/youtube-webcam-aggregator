@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.4.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.3.0...v2.4.0) (2026-06-21)
+
+### Features
+
+* **scraper:** add Camscape source (multi-angle aggregator) + EarthCam extractor ([#79](https://github.com/mrgeetv/live-webcam-aggregator/issues/79)) ([662dde4](https://github.com/mrgeetv/live-webcam-aggregator/commit/662dde424c8d0e05769a7984cd2acbb05249ff4e))
+
 ## [2.3.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.2.1...v2.3.0) (2026-06-21)
 
 ### Features
