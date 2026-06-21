@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.2.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.1.2...v2.2.0) (2026-06-21)
+
+### Features
+
+* **playlist:** default youtube to direct playback; add PROXY_YOUTUBE toggle ([#76](https://github.com/mrgeetv/live-webcam-aggregator/issues/76)) ([eaf58b6](https://github.com/mrgeetv/live-webcam-aggregator/commit/eaf58b6e5f3a8c977f2ccab9922139a9f924b85c))
+
 ## [2.1.2](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.1.1...v2.1.2) (2026-06-21)
 
 ### Bug Fixes
