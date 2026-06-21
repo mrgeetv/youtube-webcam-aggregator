@@ -4,8 +4,8 @@ from webcam_aggregator.models import Candidate
 from webcam_aggregator.sources.base import (
     HtmlScraperSource,
     extract_candidates,
-    location_from_url,
     with_location,
+    with_location_parts,
 )
 
 
@@ -60,24 +60,6 @@ def test_html_scraper_base_crawls_skips_empty_and_titles():
     assert c.predisc_key == "yt:aaaaaaaaaaa"
 
 
-def test_location_from_url():
-    base = "https://worldcams.tv"
-    # full path, most-specific first
-    assert (
-        location_from_url(f"{base}/italy/venice/rialto-bridge")
-        == "Rialto Bridge, Venice, Italy"
-    )
-    assert (
-        location_from_url(f"{base}/barbados/barbados-beaches")
-        == "Barbados Beaches, Barbados"
-    )
-    assert (
-        location_from_url("https://www.cxtvlive.com/live-camera/yosemite-falls")
-        == "Yosemite Falls"
-    )
-    assert location_from_url("https://worldcams.tv/") == ""
-
-
 def test_with_location_appends_only_new_parts():
     wc = "https://worldcams.tv"
     # generic title gains the distinguishing place (redundant country/word dropped)
@@ -122,6 +104,17 @@ def test_with_location_drops_category_from_suffix():
     assert (
         with_location("Maspalomas Beach", url, drop="Webcams")
         == "Maspalomas Beach — Beaches, Gran Canaria, Spain"
+    )
+
+
+def test_with_location_parts_dedupes_repeated_breadcrumb_levels():
+    # some breadcrumbs name the same place at two levels (a parish == its only town)
+    assert (
+        with_location_parts(
+            "St. George's Town Square - Bermuda",
+            ["Bermuda", "St George's Parish", "St George's Parish"],
+        )
+        == "St. George's Town Square - Bermuda — St George's Parish"
     )
 
 

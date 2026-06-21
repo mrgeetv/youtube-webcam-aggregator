@@ -82,9 +82,23 @@ def _location_parts(page_url: str) -> list[str]:
     ]
 
 
-def location_from_url(page_url: str) -> str:
-    """Full location, most-specific first: "Skid Row, Los Angeles, United States"."""
-    return ", ".join(reversed(_location_parts(page_url)))
+def with_location_parts(title: str, parts: list[str], *, drop: str = "") -> str:
+    """Append the location `parts` (general -> specific) the title doesn't already name,
+    keeping the cam's category (`drop`) out of the suffix and dropping repeated parts
+    (some breadcrumbs name the same place at two levels, e.g. a parish == its only town).
+    Shared by URL-path sources and sources whose geo lives elsewhere (a breadcrumb)."""
+    nt = _norm(title)
+    dn = _norm(drop)
+    extra: list[str] = []
+    seen: set[str] = set()
+    for p in reversed(parts):
+        n = _norm(p)
+        if n and n != dn and n not in seen and (not title.strip() or n not in nt):
+            extra.append(p)
+            seen.add(n)
+    if not title.strip():
+        return ", ".join(extra) or title
+    return f"{title} — {', '.join(extra)}" if extra else title
 
 
 def with_location(title: str, page_url: str, *, drop: str = "") -> str:
@@ -96,15 +110,7 @@ def with_location(title: str, page_url: str, *, drop: str = "") -> str:
     the cam's category: players show it as the group, so we keep it out of the suffix
     too (no "Playa del Inglés — Beaches, Gran Canaria, Spain").
     """
-    parts = _location_parts(page_url)
-    if not title.strip():
-        return location_from_url(page_url) or title
-    nt = _norm(title)
-    dn = _norm(drop)
-    extra = [
-        p for p in reversed(parts) if _norm(p) and _norm(p) not in nt and _norm(p) != dn
-    ]
-    return f"{title} — {', '.join(extra)}" if extra else title
+    return with_location_parts(title, _location_parts(page_url), drop=drop)
 
 
 def extract_candidates(html: str, *, page_url: str, source: str) -> Iterator[Candidate]:
@@ -179,13 +185,19 @@ class HtmlScraperSource(ABC, Generic[Ctx]):
     ) -> str:
         """Display title for one candidate, given its page's category + context."""
 
+    def _candidates(self, html: str, url: str) -> Iterable[Candidate]:
+        """Per-page candidate extraction. Defaults to the shared extraction ladder;
+        override for sources whose embeds it doesn't recognise (a player config with a
+        site-specific token, a YouTube id in a JS var, …)."""
+        return extract_candidates(html, page_url=url, source=self.name)
+
     def discover(self) -> Iterator[Candidate]:
         urls = self._page_urls()
         for url, html in zip(urls, thread_map(self._fetch.get, urls)):
             if not html:
                 continue
             category, ctx = self._page_meta(html, url)
-            for c in extract_candidates(html, page_url=url, source=self.name):
+            for c in self._candidates(html, url):
                 yield replace(
                     c, title=self._title_for(c, url, category, ctx), category=category
                 )

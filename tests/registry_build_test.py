@@ -10,7 +10,7 @@ class _Stub:
 
 
 _EXTRACTORS: dict[str, Extractor] = {
-    n: _Stub() for n in ("ytdlp", "direct", "metatag", "baltic", "ipcamlive")
+    n: _Stub() for n in ("ytdlp", "direct", "metatag", "baltic", "ipcamlive", "skyline")
 }
 
 
@@ -24,6 +24,11 @@ def test_real_registry_predicates():
     # the MAJORITY (direct ipcamlive m3u8) must route to DirectHls, NOT the resolver
     assert _route("https://s79.ipcamlive.com/streams/abc/stream.m3u8") == "direct"
     assert _route("https://balticlivecam.com/cameras/x/?embed") == "baltic"
+    # skyline cam PAGE -> the skyline resolver; its youtube embeds fall through to ytdlp
+    assert (
+        _route("https://www.skylinewebcams.com/en/webcam/italia/x/cam.html")
+        == "skyline"
+    )
     assert _route("https://www.youtube.com/watch?v=aaaaaaaaaaa") == "ytdlp"
     assert _route("https://worldcams.tv/player?url=https://x/p.m3u8") == "direct"
     assert _route("https://example.com/page") is None

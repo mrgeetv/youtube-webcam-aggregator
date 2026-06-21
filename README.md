@@ -15,6 +15,7 @@ stream is actually played.
 | YouTube Data API | Live webcam broadcasts found by search |
 | worldcams.tv | Scraped camera directory |
 | cxtvlive.com | Scraped camera directory |
+| skylinewebcams.com | Scraped camera directory (own HLS cams + curated YouTube) |
 
 The same camera found on more than one source is merged into a single channel.
 
@@ -23,7 +24,7 @@ The same camera found on more than one source is merged into a single channel.
 - **Catalogue build** (periodic): every `CATALOGUE_INTERVAL_HOURS`, each source is
   crawled, dead streams are dropped, survivors are de-duplicated, mapped to a unified
   category, and written into a playlist of stable internal URLs. This is the slow
-  part (roughly **6–7 minutes** for a ~2000-cam catalogue; scales with how big the
+  part (roughly **6–7 minutes** for a ~5000-cam catalogue; scales with how big the
   sources are and with `SCRAPE_WORKERS`).
 - **On-demand serving**: when a player opens a channel, the container resolves the
   stream on request and proxies the HLS manifest, refreshing expiring tokens
@@ -131,11 +132,10 @@ All via environment variables (see `.env.example`):
 | `SEARCH_QUERY` | built-in webcam query | YouTube search terms (`\|`=OR, space=AND, `-`=exclude) |
 | `YOUTUBE_API_KEY` | (required) | YouTube Data API v3 key |
 
-> **Resource usage:** memory peaks during the periodic catalogue build (it fetches
-> and liveness-checks every source concurrently), then settles back down once the
-> playlist is built (e.g. a transient ~1 GB during the build vs ~270 MB at rest for a
-> ~2000-cam catalogue). The build is the high-water mark; lower `SCRAPE_WORKERS` to
-> cap that peak. Live memory is on `/health` (`rss_mb`).
+> **Resource usage:** for a ~5000-cam catalogue the process sits around **~450 MB**,
+> rising only modestly (to roughly **~0.5 GB**) during the periodic build, when all
+> sources fetch + liveness-check concurrently. Lower `SCRAPE_WORKERS` to cap that build
+> peak. Live memory is on `/health` (`rss_mb`).
 
 ## Tuning the search query
 
