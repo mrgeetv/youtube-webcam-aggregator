@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import logging
+
+log = logging.getLogger("webcam-aggregator.categories")
+
 _MAP: dict[str, str] = {
     "Animals": "Animals",
     "Birds": "Animals",
@@ -40,6 +44,12 @@ _MAP: dict[str, str] = {
     "Space": "Space",
     "Christmas": "Seasonal",
     "Radio Studios": "Studios",
+    "Weather": "Weather",
+    "Sports Live": "Sports",
+    "Watch Soccer Live": "Sports",
+    # Non-content tags and a source's literal "Other" -> our "Other" (not Unmapped).
+    "High Definition Hd": "Other",
+    "Other": "Other",
 }
 _NATIVE_YT: set[str] = {
     "Entertainment",
@@ -51,6 +61,13 @@ _NATIVE_YT: set[str] = {
 }
 
 
+# Streams whose source gave a category we don't recognise land here — distinct from
+# "Other" (the source gave NO category) — so a missing mapping is visible in the player
+# and logged, instead of silently swelling "Other".
+UNMAPPED = "Unmapped Category"
+_seen_unmapped: set[str] = set()
+
+
 def map_category(raw: str | None) -> str:
     if not raw:
         return "Other"
@@ -58,14 +75,21 @@ def map_category(raw: str | None) -> str:
         return _MAP[raw]
     if raw in _NATIVE_YT:
         return raw
-    return "Other"
+    if raw not in _seen_unmapped:
+        _seen_unmapped.add(raw)
+        log.warning(
+            "unmapped source category %r -> %s (add it to categories._MAP)",
+            raw,
+            UNMAPPED,
+        )
+    return UNMAPPED
 
 
 # Every category that can appear as a playlist group-title — i.e. the full set a user
 # may name in EXCLUDE_CATEGORIES. Source of truth; the README list is drift-guarded by
 # a test (tests/categories_test.py).
 ALL_CATEGORIES: tuple[str, ...] = tuple(
-    sorted(set(_MAP.values()) | _NATIVE_YT | {"Other"})
+    sorted(set(_MAP.values()) | _NATIVE_YT | {"Other", UNMAPPED})
 )
 
 _ALL_CASEFOLDED: frozenset[str] = frozenset(c.casefold() for c in ALL_CATEGORIES)

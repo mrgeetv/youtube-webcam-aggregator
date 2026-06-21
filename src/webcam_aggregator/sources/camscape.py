@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import override
 
 from ..fetch import thread_map
 from ..models import Candidate
 from .base import HtmlScraperSource, predisc_key, with_location_parts
+
+log = logging.getLogger("webcam-aggregator.camscape")
 
 _BASE = "https://www.camscape.com"
 
@@ -87,9 +90,20 @@ class CamscapeSource(HtmlScraperSource[_Ctx]):
 
     @override
     def _page_urls(self) -> list[str]:
-        cats = sorted(
+        cat_pages = sorted(
             set(_CAT_PAGE.findall(self._fetch.get(f"{_BASE}/showing/") or ""))
         )
+        # Crawl-first coverage: flag category pages we have no mapping for, so a new
+        # camscape category surfaces (its cams also land in "Unmapped Category") instead
+        # of silently dropping to "Other".
+        slugs = [u.rstrip("/").rsplit("/", 1)[-1] for u in cat_pages]
+        unmapped = sorted(s for s in slugs if s not in _CATEGORY)
+        if unmapped:
+            log.warning(
+                "camscape: %d category page(s) not in _CATEGORY (-> Unmapped Category): %s",
+                len(unmapped),
+                ", ".join(unmapped),
+            )
 
         def crawl(cat: str) -> set[str]:
             out: set[str] = set()
@@ -106,15 +120,18 @@ class CamscapeSource(HtmlScraperSource[_Ctx]):
             return out
 
         cams: set[str] = set()
-        for found in thread_map(crawl, cats):
+        for found in thread_map(crawl, cat_pages):
             cams |= found
         return sorted(cams)
 
     @override
     def _page_meta(self, html: str, url: str) -> tuple[str | None, _Ctx]:
-        category = next(
-            (_CATEGORY.get(t) for t in _TAG.findall(html) if _CATEGORY.get(t)), None
-        )
+        tags = _TAG.findall(html)
+        category = next((_CATEGORY[t] for t in tags if _CATEGORY.get(t)), None)
+        if category is None:
+            # No mapped tag: surface an unknown tag so it lands in "Unmapped Category"
+            # (+ gets logged); else None -> "Other" (untagged, or only None-mapped tags).
+            category = next((t for t in tags if t not in _CATEGORY), None)
         # location tags are specific->general in the doc; with_location_parts wants
         # general->specific, so reverse + prettify.
         locs = list(dict.fromkeys(_LOC.findall(html)))

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import re
 from typing import override
 
 from ..fetch import FetcherProtocol, thread_map
 from ..models import Candidate
 from .base import HtmlScraperSource, with_location_parts
+
+log = logging.getLogger("webcam-aggregator.skyline")
 
 _BASE = "https://www.skylinewebcams.com"
 
@@ -24,6 +27,10 @@ _CATEGORY: dict[str, str | None] = {
     "volcanoes": "Volcanoes",
     "live-web": None,
 }
+
+# Skyline's category index lists every category page; crawling it (vs hardcoding the
+# slugs above) means a newly-added category surfaces — logged + -> "Unmapped Category".
+_CAT_INDEX = re.compile(r"/en/live-cams-category/([a-z0-9-]+)-cams\.html")
 
 # Cam detail links are RELATIVE (no leading slash); the country/region/city nav links are
 # absolute with a `btn …tag` class. The leading-slash distinction keeps the two apart.
@@ -57,16 +64,32 @@ class SkylineSource(HtmlScraperSource[_Ctx]):
         super().__init__(fetch)
         self._cat = {}  # cam URL -> category (only set from the category pages)
 
+    def _category_slugs(self) -> list[str]:
+        """Skyline's category slugs from its index page, so a newly-added category
+        surfaces instead of being silently missed. Falls back to the known slugs if the
+        index is unreachable."""
+        html = self._fetch.get(f"{_BASE}/en/live-cams.html") or ""
+        return list(dict.fromkeys(_CAT_INDEX.findall(html))) or list(_CATEGORY)
+
     @override
     def _page_urls(self) -> list[str]:
         cams: set[str] = set()
         seed = ""
-        cat_urls = [f"{_BASE}/en/live-cams-category/{s}-cams.html" for s in _CATEGORY]
-        # Category pages give the bulk of the cams AND their category.
-        for slug, html in zip(_CATEGORY, thread_map(self._fetch.get, cat_urls)):
+        slugs = self._category_slugs()
+        unmapped = sorted(s for s in slugs if s not in _CATEGORY)
+        if unmapped:
+            log.warning(
+                "skyline: %d category page(s) not in _CATEGORY (-> Unmapped Category): %s",
+                len(unmapped),
+                ", ".join(unmapped),
+            )
+        cat_urls = [f"{_BASE}/en/live-cams-category/{s}-cams.html" for s in slugs]
+        # Category pages give the bulk of the cams AND their category (an unknown slug
+        # passes through as the raw slug, which maps to "Unmapped Category").
+        for slug, html in zip(slugs, thread_map(self._fetch.get, cat_urls)):
             html = html or ""
             seed = seed or html
-            cat = _CATEGORY[slug]
+            cat = _CATEGORY.get(slug, slug)
             for rel in _CAM_LINK.findall(html):
                 u = f"{_BASE}/{rel}"
                 cams.add(u)

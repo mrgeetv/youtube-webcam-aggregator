@@ -1,3 +1,5 @@
+import pytest
+
 from webcam_aggregator.sources.camscape import CamscapeSource
 
 _BASE = "https://www.camscape.com"
@@ -56,3 +58,20 @@ def test_camscape_normalises_twitch_embed_for_ytdlp():
     }
     cands = list(CamscapeSource(_FakeFetch(pages)).discover())
     assert cands[0].target_url == "https://www.twitch.tv/foo"
+
+
+def test_camscape_unknown_tag_flagged_unmapped(caplog: pytest.LogCaptureFixture):
+    import logging
+
+    cam = f"{_BASE}/webcam/drone-cam/"
+    streams = '[{"name":"Drone","url":"https://www.youtube.com/embed/bbbbbbbbbbb"}]'
+    pages = {
+        f"{_BASE}/showing/": f'<a href="{_BASE}/showing/drones/">D</a>',
+        f"{_BASE}/showing/drones/": f'<a href="{cam}">x</a>',
+        cam: _cam_page(streams, tags="drones"),  # 'drones' isn't in _CATEGORY
+    }
+    with caplog.at_level(logging.WARNING, logger="webcam-aggregator.camscape"):
+        cands = list(CamscapeSource(_FakeFetch(pages)).discover())
+    # the unknown tag passes through as the raw slug -> map_category -> "Unmapped Category"
+    assert cands[0].category == "drones"
+    assert any("drones" in r.getMessage() for r in caplog.records)  # crawl-first log

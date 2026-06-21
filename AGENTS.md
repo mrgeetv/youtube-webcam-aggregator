@@ -56,7 +56,15 @@ The app is two phases, decoupled by a catalogue snapshot:
   or `_PROXY_SEGMENT_HOSTS` (segment relay) in `serving.py`, or segments will 403.
 - **Category mapping** lives in `categories.py` (`_MAP`); YouTube categories come
   from the Data API (`videos.list` categoryId) and pass through, everything else
-  maps to the unified taxonomy or "Other". `EXCLUDE_CATEGORIES` (config) post-filters
+  maps to the unified taxonomy. `map_category` splits the two miss cases: a source
+  that gave **no** category → "Other"; a source that gave one we **don't recognise** →
+  **"Unmapped Category"** (a distinct group, visible in the player) + a once-per-process
+  `WARNING` naming the raw value, so a missing mapping surfaces instead of hiding in
+  "Other". Sources that pre-map slugs (`camscape`, `skyline`) pass an unknown slug
+  through raw so it reaches that path, and **crawl their category index first** —
+  camscape's `/showing/`, skyline's `/en/live-cams.html` — logging slugs absent from
+  their slug map (worldcams/cxtvlive have no clean index, so they surface unmapped
+  categories per-stream via `map_category`). `EXCLUDE_CATEGORIES` (config) post-filters
   the built catalogue by mapped category, across all sources. The full excludable set
   is `categories.ALL_CATEGORIES` — a test guards that the README list matches it.
 - **Add a config/env var** — parse it in `config.py` via the `_*_env` helpers, and

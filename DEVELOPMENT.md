@@ -211,6 +211,11 @@ source collapse (empty-guard). At `DEBUG`, it also logs dropped/failed resolves 
 liveness-probe failures. Live process memory (`rss_mb`) and per-source counts are
 exposed on the `/health` endpoint.
 
+A source category we have no mapping for logs a `WARNING` (once per distinct value) and
+the cam lands in the `Unmapped Category` group rather than `Other`; camscape and skyline
+also log an upfront per-source line listing the unmapped category slugs they crawled. Add
+the mapping to `categories._MAP` (or the source's own slug map) to clear it.
+
 Suspect config logs a `WARNING` at startup rather than failing silently: a non-numeric
 `CATALOGUE_INTERVAL_HOURS`/`SCRAPE_WORKERS`/`MAX_PARALLEL_SOURCES`, a
 non-`true`/`false` `PROXY_YOUTUBE`, an
