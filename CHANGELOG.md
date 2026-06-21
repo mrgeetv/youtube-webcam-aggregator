@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.1.2](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.1.1...v2.1.2) (2026-06-21)
+
+### Bug Fixes
+
+* **playlist:** serve the live edge of DVR youtube manifests (was 502) ([#75](https://github.com/mrgeetv/live-webcam-aggregator/issues/75)) ([7d1b310](https://github.com/mrgeetv/live-webcam-aggregator/commit/7d1b310585d34a82b89f57dcd031d44164057691))
+
 ## [2.1.1](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.1.0...v2.1.1) (2026-06-21)
 
 ### Code Refactoring
