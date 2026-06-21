@@ -72,3 +72,33 @@ def test_skips_camera_page_returning_none() -> None:
     fetcher: FetcherProtocol = _FakeFetcher(pages)
     cands = list(WorldcamsSource(fetch=fetcher).discover())
     assert cands == []
+
+
+_MULTI_LIST = (
+    '<div class="cam-promo__title">' '<a href="/spain/gran-canaria/beaches">B</a></div>'
+)
+_MULTI_CAM = (
+    "<h1>Gran Canaria Beaches Webcam</h1>"
+    '<a class="streams__item active" id="streams__item_0" href="#"'
+    ' onClick="SetStream(0,1); return false;">Playa del Inglés</a>'
+    '<a class="streams__item" id="streams__item_1378" href="#"'
+    ' onClick="SetStream(1378,1); return false;">Maspalomas Beach</a>'
+    "streams[0] = '<iframe src=\\\"https://www.youtube.com/embed/aaaaaaaaaaa\\\"></iframe>';"
+    "streams[1378] = '<iframe src=\\\"https://www.youtube.com/embed/bbbbbbbbbbb\\\"></iframe>';"
+)
+
+
+def test_multi_stream_page_uses_per_cam_names() -> None:
+    # A roundup page that embeds several cams must give each its own selector name
+    # (keyed by stream-id), not the shared page <h1> for all of them.
+    pages = {
+        "https://worldcams.tv/list/?page=1": _MULTI_LIST,
+        "https://worldcams.tv/list/?page=2": "",
+        "https://worldcams.tv/spain/gran-canaria/beaches": _MULTI_CAM,
+    }
+    cands = list(WorldcamsSource(fetch=_FakeFetcher(pages)).discover())
+    titles = {c.title for c in cands}
+    assert "Playa del Inglés — Beaches, Gran Canaria, Spain" in titles
+    assert "Maspalomas Beach — Beaches, Gran Canaria, Spain" in titles
+    # keyed by the worldcams stream-id → distinct, reorder-stable /stream ids
+    assert {c.angle_key for c in cands} == {"0", "1378"}

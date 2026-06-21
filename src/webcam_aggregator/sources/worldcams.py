@@ -12,6 +12,8 @@ _MAX_LIST_PAGES = 80
 _LINKS = re.compile(r'class="cam-promo__title"[^>]*>\s*<a href="([^"]+)"')
 _TITLE = re.compile(r"<h1[^>]*>([^<]{1,120})</h1>")
 _CATEGORY = re.compile(r'Category:\s*(?:&nbsp;)?<a href="/([^/]+)/">([^<]+)</a>')
+# Per-cam names on multi-stream pages: <a … id="streams__item_<stream-id>" …>Name</a>
+_STREAM_NAMES = re.compile(r'id="streams__item_(\d+)"[^>]*>\s*([^<]+?)\s*</a>')
 
 
 class WorldcamsSource:
@@ -39,8 +41,13 @@ class WorldcamsSource:
             if not html:
                 continue
             tm = _TITLE.search(html)
+            page_title = tm.group(1).strip() if tm else ""
             cm = _CATEGORY.search(html)
-            title = with_location(tm.group(1).strip() if tm else "", url)
             category = cm.group(2).strip() if cm else None
+            # stream-id -> specific cam name (multi-stream pages); single-stream pages
+            # have no selector, so these fall back to the page <h1>.
+            names = {sid: name.strip() for sid, name in _STREAM_NAMES.findall(html)}
             for c in extract_candidates(html, page_url=url, source="worldcams"):
+                specific = names.get(c.angle_key or "", "")
+                title = with_location(specific or page_title, url)
                 yield replace(c, title=title, category=category)

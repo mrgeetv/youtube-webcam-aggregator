@@ -90,6 +90,22 @@ def test_multiangle_distinct_keys():
     assert len({c.angle_key for c in cands}) == 2
 
 
+def test_single_quote_streams_keyed_by_stream_id():
+    # worldcams multi-cam pages use streams[<id>] = '<iframe …>' (SINGLE quotes),
+    # keyed by the site's stream-id (not a 0..n index). Each candidate's angle_key
+    # IS that stream-id, so it survives the page reordering its cams.
+    html = (
+        "streams[0] = '<iframe src=\\\"https://www.youtube.com/embed/aaaaaaaaaaa\\\"></iframe>';"
+        "streams[1378] = '<iframe src=\\\"https://en.example.es/cam\\\"></iframe>';"
+    )
+    cands = list(
+        extract_candidates(html, page_url="https://worldcams.tv/x", source="worldcams")
+    )
+    by_key = {c.angle_key: c.target_url for c in cands}
+    assert by_key["0"].endswith("/embed/aaaaaaaaaaa")
+    assert by_key["1378"] == "https://en.example.es/cam"
+
+
 def test_channel_has_no_predisc_key():
     html = '<a href="https://www.youtube.com/@SomeCam/live">live</a>'
     # NOTE: a bare channel link with no attribution prefix is a stream candidate
