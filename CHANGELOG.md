@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.5.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.4.0...v2.5.0) (2026-06-21)
+
+### Features
+
+* **scraper:** surface unmapped source categories instead of burying them in "Other" ([#80](https://github.com/mrgeetv/live-webcam-aggregator/issues/80)) ([6137750](https://github.com/mrgeetv/live-webcam-aggregator/commit/6137750bf5ddd37d1bc4ca6c6bc9169949c9a956))
+
 ## [2.4.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.3.0...v2.4.0) (2026-06-21)
 
 ### Features
