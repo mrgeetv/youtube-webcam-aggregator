@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.2.1](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.2.0...v2.2.1) (2026-06-21)
+
+### Performance Improvements
+
+* **scraper:** build catalogue sources concurrently + add shared HtmlScraperSource base ([#77](https://github.com/mrgeetv/live-webcam-aggregator/issues/77)) ([f7322e2](https://github.com/mrgeetv/live-webcam-aggregator/commit/f7322e292c717f884f03aa5f4216d2146d32ffc3))
+
 ## [2.2.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.1.2...v2.2.0) (2026-06-21)
 
 ### Features
