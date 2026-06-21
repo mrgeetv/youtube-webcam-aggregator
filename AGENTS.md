@@ -10,7 +10,10 @@
 
 The app is two phases, decoupled by a catalogue snapshot:
 
-1. **Catalogue build** (`catalogue.py`, every `CATALOGUE_INTERVAL_HOURS`): each
+1. **Catalogue build** (`catalogue.py`, every `CATALOGUE_INTERVAL_HOURS`): sources run
+   **concurrently** (discover + liveness), capped at `MAX_PARALLEL_SOURCES` so total
+   build concurrency stays ~cap × `SCRAPE_WORKERS` no matter how many sources exist, and
+   a source that crashes is isolated (reuses its last good set, the rest proceed). Each
    `Source.discover()` yields `Candidate`s → liveness filter (YouTube via the Data
    API batch; everything else via a **fetch-verified probe** — `make_is_alive`
    actually fetches the HLS manifest and drops dead/404 and DASH cams) → per-source
@@ -36,10 +39,13 @@ The app is two phases, decoupled by a catalogue snapshot:
 **`build_app()` in `app.py` is the wiring seam.** To extend:
 
 - **Add a source** — implement the `Source` protocol (`sources/base.py`): a `name`
-  and `discover() -> Iterable[Candidate]`. HTML sources subclass the scraper base and
-  reuse the extraction ladder. Add the instance to `active_sources` in `build_app`.
-  Set `Candidate.predisc_key` so dedup can merge it (`yt:<id>` for YouTube,
-  `hls:<normalised>` for direct m3u8, `None` = never merged).
+  and `discover() -> Iterable[Candidate]`. HTML scrapers subclass `HtmlScraperSource`
+  (`sources/base.py`) and implement three hooks — `_page_urls()` (the cam detail-page
+  URLs), `_page_meta(html, url)` (per-page `(category, ctx)`), and `_title_for(cand,
+  url, category, ctx)` — the base owns the concurrent fetch + the extraction ladder.
+  Add the instance to `active_sources` in `build_app`. Set `Candidate.predisc_key` so
+  dedup can merge it (`yt:<id>` for YouTube, `hls:<normalised>` for direct m3u8,
+  `None` = never merged).
 - **Add an extractor** — implement the `Extractor` protocol (`extractors/base.py`):
   `resolve(target_url) -> Resolved(url, stream_type, ttl_seconds)`. Add it to the
   `extractors` dict in `build_app` AND a predicate to `build_registry` (startup

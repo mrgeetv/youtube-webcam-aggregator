@@ -30,6 +30,7 @@ def test_new_field_defaults():
     assert c.search_query  # non-empty built-in default
     assert c.log_level == "INFO"
     assert c.proxy_youtube is False
+    assert c.max_parallel_sources == 4
 
 
 def test_new_fields_from_env():
@@ -39,11 +40,13 @@ def test_new_fields_from_env():
             "SEARCH_QUERY": "trains|railway",
             "LOG_LEVEL": "debug",
             "PROXY_YOUTUBE": "true",
+            "MAX_PARALLEL_SOURCES": "8",
         }
     )
     assert c.search_query == "trains|railway"
     assert c.log_level == "DEBUG"  # normalised to upper-case
     assert c.proxy_youtube is True
+    assert c.max_parallel_sources == 8
 
 
 def test_exclude_categories_parsed_casefolded():
@@ -68,6 +71,18 @@ def test_bad_proxy_youtube_warns(caplog: pytest.LogCaptureFixture) -> None:
         c = config.load({"YOUTUBE_API_KEY": "k", "PROXY_YOUTUBE": "maybe"})
     assert "PROXY_YOUTUBE" in caplog.text
     assert c.proxy_youtube is False  # bad value falls back to the default
+
+
+def test_bad_max_parallel_sources_warns(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING, logger="webcam-aggregator.config"):
+        c = config.load({"YOUTUBE_API_KEY": "k", "MAX_PARALLEL_SOURCES": "lots"})
+    assert "MAX_PARALLEL_SOURCES" in caplog.text
+    assert c.max_parallel_sources == 4  # bad value falls back to the default
+
+
+def test_max_parallel_sources_clamped_to_minimum() -> None:
+    c = config.load({"YOUTUBE_API_KEY": "k", "MAX_PARALLEL_SOURCES": "0"})
+    assert c.max_parallel_sources == 1  # _int_env clamps to the minimum
 
 
 def test_localhost_public_base_url_warns(caplog: pytest.LogCaptureFixture) -> None:

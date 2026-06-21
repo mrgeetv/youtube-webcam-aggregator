@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import re
+from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
-from typing import Protocol
+from dataclasses import replace
+from typing import Generic, Protocol, TypeVar
 from urllib.parse import unquote, urlsplit
 
+from ..fetch import FetcherProtocol, thread_map
 from ..models import Candidate
 
 _YT_VIDEO = re.compile(
@@ -142,3 +145,47 @@ def extract_candidates(html: str, *, page_url: str, source: str) -> Iterator[Can
             target_url=target,
             predisc_key=_predisc_key(target),
         )
+
+
+Ctx = TypeVar("Ctx")
+
+
+class HtmlScraperSource(ABC, Generic[Ctx]):
+    """Shared crawl loop for HTML scraper sources. Subclasses supply three hooks —
+    how to find the cam detail-page URLs, the per-page (category, context), and the
+    per-candidate title. The concurrent fetch (`thread_map`), empty-page skipping, and
+    `extract_candidates` wiring live here, so each source stays a handful of regexes.
+    `Ctx` is whatever per-page state a source precomputes once (e.g. a stream-id ->
+    name map) and reuses across that page's candidates in `_title_for`."""
+
+    name: str
+    _fetch: FetcherProtocol
+
+    def __init__(self, fetch: FetcherProtocol) -> None:
+        self._fetch = fetch
+
+    @abstractmethod
+    def _page_urls(self) -> list[str]:
+        """All cam detail-page URLs to scrape (e.g. from a sitemap or paginated list)."""
+
+    @abstractmethod
+    def _page_meta(self, html: str, url: str) -> tuple[str | None, Ctx]:
+        """Per-page (category, context). Computed once per page; ctx is handed to
+        `_title_for` for every candidate on the page."""
+
+    @abstractmethod
+    def _title_for(
+        self, cand: Candidate, url: str, category: str | None, ctx: Ctx
+    ) -> str:
+        """Display title for one candidate, given its page's category + context."""
+
+    def discover(self) -> Iterator[Candidate]:
+        urls = self._page_urls()
+        for url, html in zip(urls, thread_map(self._fetch.get, urls)):
+            if not html:
+                continue
+            category, ctx = self._page_meta(html, url)
+            for c in extract_candidates(html, page_url=url, source=self.name):
+                yield replace(
+                    c, title=self._title_for(c, url, category, ctx), category=category
+                )

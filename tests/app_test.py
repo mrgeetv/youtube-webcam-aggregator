@@ -114,6 +114,7 @@ def test_build_app_starts_without_youtube_when_client_init_fails(
         log_level="INFO",
         exclude_categories=frozenset(),
         proxy_youtube=False,
+        max_parallel_sources=4,
     )
     store, _cache, rebuild, source_counts = _app.build_app(cfg)
     assert store is not None

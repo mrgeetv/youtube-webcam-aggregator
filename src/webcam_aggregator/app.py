@@ -370,6 +370,7 @@ def build_app(
             youtube_live=youtube_live,
             history=history,
             exclude_categories=cfg.exclude_categories,
+            max_parallel_sources=cfg.max_parallel_sources,
         )
         store.swap(entries)
         log.info("catalogue rebuilt: %d entries", len(entries))

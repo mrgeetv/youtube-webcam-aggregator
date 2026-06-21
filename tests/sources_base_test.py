@@ -1,8 +1,63 @@
+from typing import override
+
+from webcam_aggregator.models import Candidate
 from webcam_aggregator.sources.base import (
+    HtmlScraperSource,
     extract_candidates,
     location_from_url,
     with_location,
 )
+
+
+class _FakeFetch:
+    _pages: dict[str, str]
+
+    def __init__(self, pages: dict[str, str]) -> None:
+        self._pages = pages
+
+    def get(self, url: str, _timeout: float = 20.0) -> str | None:
+        return self._pages.get(url)
+
+
+class _StubSource(HtmlScraperSource[str]):
+    name: str = "stub"
+    _urls: list[str]
+
+    def __init__(self, fetch: _FakeFetch, urls: list[str]) -> None:
+        super().__init__(fetch)
+        self._urls = urls
+
+    @override
+    def _page_urls(self) -> list[str]:
+        return self._urls
+
+    @override
+    def _page_meta(self, html: str, url: str) -> tuple[str | None, str]:
+        return "Beaches", "Page Title"
+
+    @override
+    def _title_for(
+        self, cand: Candidate, url: str, category: str | None, ctx: str
+    ) -> str:
+        return f"{ctx} [{category}]"
+
+
+def test_html_scraper_base_crawls_skips_empty_and_titles():
+    pages = {
+        "https://s/a": '<iframe src="https://www.youtube.com/embed/aaaaaaaaaaa"></iframe>',
+        "https://s/b": "",  # empty body -> skipped by the base loop
+    }
+    src = _StubSource(
+        _FakeFetch(pages), ["https://s/a", "https://s/b", "https://s/missing"]
+    )
+    cands = list(src.discover())
+    assert len(cands) == 1  # empty + missing (get -> None) pages dropped
+    c = cands[0]
+    assert c.source == "stub"
+    assert c.source_page_url == "https://s/a"
+    assert c.category == "Beaches"
+    assert c.title == "Page Title [Beaches]"
+    assert c.predisc_key == "yt:aaaaaaaaaaa"
 
 
 def test_location_from_url():

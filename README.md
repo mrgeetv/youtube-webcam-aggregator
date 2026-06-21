@@ -121,14 +121,15 @@ All via environment variables (see `.env.example`):
 
 | Variable | Default | Description |
 | -------- | ------- | ----------- |
-| `YOUTUBE_API_KEY` | (required) | YouTube Data API v3 key |
-| `PUBLIC_BASE_URL` | `http://localhost:8000` | Externally-reachable base for the emitted URLs |
 | `CATALOGUE_INTERVAL_HOURS` | `6` | Hours between catalogue refreshes (min 1) |
-| `SEARCH_QUERY` | built-in webcam query | YouTube search terms (`\|`=OR, space=AND, `-`=exclude) |
 | `EXCLUDE_CATEGORIES` | (none) | Comma-separated categories to drop, across all sources, case-insensitive. See *Filtering by category* |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
-| `SCRAPE_WORKERS` | `min(16, cpu×4)` | Concurrency for scraping + liveness during the catalogue build. Lower it to reduce peak build-time memory (at the cost of a slower build) |
+| `MAX_PARALLEL_SOURCES` | `4` | How many sources discover + liveness-check at once (min 1). Total build concurrency ≈ this × `SCRAPE_WORKERS`; extra sources queue |
 | `PROXY_YOUTUBE` | `false` | `false` redirects players straight to YouTube (lower latency, but playback stops when YouTube's ~6h stream token expires — reselect to resume). `true` proxies YouTube through the server so it keeps playing past that, at a small latency cost |
+| `PUBLIC_BASE_URL` | `http://localhost:8000` | Externally-reachable base for the emitted URLs |
+| `SCRAPE_WORKERS` | `min(16, cpu×4)` | Per-source concurrency for scraping + liveness during the catalogue build (sources also run concurrently). Lower it to reduce peak build-time memory (at the cost of a slower build) |
+| `SEARCH_QUERY` | built-in webcam query | YouTube search terms (`\|`=OR, space=AND, `-`=exclude) |
+| `YOUTUBE_API_KEY` | (required) | YouTube Data API v3 key |
 
 > **Resource usage:** memory peaks during the periodic catalogue build (it fetches
 > and liveness-checks every source concurrently), then settles back down once the
