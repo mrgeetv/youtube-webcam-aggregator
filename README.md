@@ -132,10 +132,10 @@ All via environment variables (see `.env.example`):
 | `SEARCH_QUERY` | built-in webcam query | YouTube search terms (`\|`=OR, space=AND, `-`=exclude) |
 | `YOUTUBE_API_KEY` | (required) | YouTube Data API v3 key |
 
-> **Resource usage:** for a ~5000-cam catalogue the process sits around **~450 MB**,
-> rising only modestly (to roughly **~0.5 GB**) during the periodic build, when all
-> sources fetch + liveness-check concurrently. Lower `SCRAPE_WORKERS` to cap that build
-> peak. Live memory is on `/health` (`rss_mb`).
+> **Resource usage:** a ~5000-cam catalogue settles to **~400 MB** at rest, but the
+> process **peaks ~1.2 GB transiently during the periodic build** (all sources crawl
+> and liveness-check concurrently — the build is the high-water mark, not a leak). Lower
+> `SCRAPE_WORKERS` to cap that peak. Live memory is on `/health` (`rss_mb`).
 
 ## Tuning the search query
 
