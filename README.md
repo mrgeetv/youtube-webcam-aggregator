@@ -15,8 +15,8 @@ stream is actually played.
 | YouTube Data API | Live webcam broadcasts found by search |
 | worldcams.tv | Scraped camera directory |
 | cxtvlive.com | Scraped camera directory |
-| skylinewebcams.com | Scraped camera directory (own HLS cams + curated YouTube) |
-| camscape.com | Scraped aggregator — multi-angle cams (YouTube, HLS, ipcamlive, EarthCam) |
+| skylinewebcams.com | Scraped camera directory |
+| camscape.com | Scraped camera directory |
 
 The same camera found on more than one source is merged into a single channel.
 
