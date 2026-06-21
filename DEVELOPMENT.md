@@ -44,14 +44,15 @@ Configure these in your `.env` file or pass directly to docker-compose:
 
 | Variable | Default | Description |
 | -------- | ------- | ----------- |
-| `YOUTUBE_API_KEY` | (required) | YouTube Data API v3 key |
-| `PUBLIC_BASE_URL` | `http://localhost:8000` | Base URL used in playlist and manifest links |
 | `CATALOGUE_INTERVAL_HOURS` | `6` | Hours between catalogue refresh cycles |
-| `SEARCH_QUERY` | built-in webcam query | YouTube search terms (`\|`=OR, space=AND, `-`=exclude) |
 | `EXCLUDE_CATEGORIES` | (none) | Comma-separated categories to drop across all sources (case-insensitive) |
 | `LOG_LEVEL` | `INFO` | Logging verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
-| `SCRAPE_WORKERS` | `min(16, cpu×4)` | Concurrency for scraping + liveness during the catalogue build |
+| `MAX_PARALLEL_SOURCES` | `4` | How many sources discover + liveness-check at once (min 1); total build concurrency ≈ this × `SCRAPE_WORKERS` |
 | `PROXY_YOUTUBE` | `false` | `true` proxies YouTube through the server (survives the ~6h token expiry, trims DVR to the live edge); `false` (default) redirects players direct to YouTube (lower latency, stops at token expiry) |
+| `PUBLIC_BASE_URL` | `http://localhost:8000` | Base URL used in playlist and manifest links |
+| `SCRAPE_WORKERS` | `min(16, cpu×4)` | Per-source concurrency for scraping + liveness; sources also run in parallel, so build-peak concurrency ≈ this × the number running at once |
+| `SEARCH_QUERY` | built-in webcam query | YouTube search terms (`\|`=OR, space=AND, `-`=exclude) |
+| `YOUTUBE_API_KEY` | (required) | YouTube Data API v3 key |
 
 ### Using the Run Script
 
@@ -207,13 +208,16 @@ liveness-probe failures. Live process memory (`rss_mb`) and per-source counts ar
 exposed on the `/health` endpoint.
 
 Suspect config logs a `WARNING` at startup rather than failing silently: a non-numeric
-`CATALOGUE_INTERVAL_HOURS`/`SCRAPE_WORKERS`, a non-`true`/`false` `PROXY_YOUTUBE`, an
+`CATALOGUE_INTERVAL_HOURS`/`SCRAPE_WORKERS`/`MAX_PARALLEL_SOURCES`, a
+non-`true`/`false` `PROXY_YOUTUBE`, an
 unknown `LOG_LEVEL`, a `localhost` `PUBLIC_BASE_URL` (unreachable by remote players),
 or an unknown name in `EXCLUDE_CATEGORIES`.
 
-Memory peaks **during** the catalogue build (it fetches + liveness-checks every
-source concurrently) and settles back down once the playlist is built. The build is
-the high-water mark, not a leak. Lower `SCRAPE_WORKERS` to reduce that peak.
+Memory peaks **during** the catalogue build: sources run concurrently (up to
+`MAX_PARALLEL_SOURCES` at once, each fetching + liveness-checking its site with
+`SCRAPE_WORKERS` threads), then it settles back once the playlist is built. The build
+is the high-water mark, not a leak — peak concurrency is ~`MAX_PARALLEL_SOURCES` ×
+`SCRAPE_WORKERS`. Lower `SCRAPE_WORKERS` to reduce that peak.
 
 ### Viewing Debug Logs
 

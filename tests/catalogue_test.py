@@ -399,6 +399,36 @@ def test_crash_reuses_last_good_set_and_never_wipes() -> None:
         assert len(result) == 1
 
 
+def test_source_liveness_failure_is_isolated_and_reuses_history() -> None:
+    """Sources run concurrently: one whose liveness probe raises is treated like a crash
+    (reuse its last good set) and must NOT sink the other sources' results."""
+    boom = _make_candidate(
+        source="worldcams", key="hls:boom", target="https://example.com/boom.m3u8"
+    )
+    good = _make_candidate(
+        source="cxtvlive", key="hls:ok", target="https://example.com/ok.m3u8"
+    )
+
+    def _selective_alive(c: Candidate) -> bool:
+        if "boom" in c.target_url:
+            raise RuntimeError("liveness boom")
+        return True
+
+    history: dict[str, Hist] = {
+        "worldcams": Hist(last_count=1, shrink_streak=0, last_kept=[boom])
+    }
+    entries = build_catalogue(
+        [_Src("worldcams", [boom]), _Src("cxtvlive", [good])],
+        is_alive=_selective_alive,
+        youtube_live=_no_yt_live,
+        history=history,
+    )
+    srcs = {e.source for e in entries}
+    assert "cxtvlive" in srcs  # healthy source unaffected by the other's liveness crash
+    assert "worldcams" in srcs  # failed source reused its last good set
+    assert history["worldcams"].last_kept == [boom]  # history not wiped
+
+
 def test_exclude_categories_drops_matching_entries() -> None:
     """Entries whose mapped category is excluded are dropped (case-insensitive, matched
     on the unified category — Birds maps to Animals, so excluding 'animals' drops it).

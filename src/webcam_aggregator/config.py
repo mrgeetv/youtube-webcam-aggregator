@@ -34,6 +34,7 @@ class Config:
     log_level: str
     exclude_categories: frozenset[str]
     proxy_youtube: bool
+    max_parallel_sources: int
 
 
 def _int_env(env: dict[str, str], key: str, default: int, minimum: int) -> int:
@@ -110,6 +111,7 @@ def load(env: dict[str, str] | None = None) -> Config:
         log_level=e.get("LOG_LEVEL", "INFO").strip().upper() or "INFO",
         exclude_categories=_csv_set(e.get("EXCLUDE_CATEGORIES", "")),
         proxy_youtube=_bool_env(e, "PROXY_YOUTUBE", False),
+        max_parallel_sources=_int_env(e, "MAX_PARALLEL_SOURCES", 4, 1),
     )
     _warn_on_suspect_config(cfg)
     _warn_legacy_env(e)
