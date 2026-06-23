@@ -172,7 +172,7 @@ live-webcam-aggregator/
 │           ├── worldcams.py    # Worldcams.net scraper source
 │           ├── cxtvlive.py     # CXTV Live scraper source
 │           ├── camscape.py     # Camscape aggregator scraper source
-│           ├── camsecure.py    # CamSecure live-demo scraper source (direct HLS)
+│           ├── camsecure.py    # CamSecure scraper source (sitemap -> direct HLS)
 │           ├── earthcam.py     # EarthCam mapsearch API source
 │           └── skyline.py      # SkylineWebcams scraper source
 ├── scripts/                    # Helper scripts

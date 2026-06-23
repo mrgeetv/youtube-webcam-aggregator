@@ -1,21 +1,19 @@
 from __future__ import annotations
 
 import re
-from typing import override
-from urllib.parse import urljoin
+from collections.abc import Iterator
+from urllib.parse import unquote, urljoin, urlsplit
 
+from ..fetch import FetcherProtocol, thread_map
 from ..models import Candidate
-from .base import HtmlScraperSource, predisc_key
+from .base import predisc_key
 
 _BASE = "https://www.camsecure.co.uk"
-_INDEX = f"{_BASE}/Camsecure_Live_Demo_Index.html"
+_SITEMAP = f"{_BASE}/sitemap.xml"
 
-# Each cam detail page embeds its player in an iframe on the camsecure.co/.uk
-# `httpswebcam` host; that player page is a video.js with a direct `/HLS/<name>.m3u8`
-# source (open CDN — segments need no token/Referer; the player PAGE does, handled by
-# `_REFERER_HOSTS`). The index also lists product/info pages (hosting, FAQ, world map …)
-# that carry "webcam" in their name — `_SKIP` drops them, and a couple that embed a demo
-# stream are caught by the iframe/HLS checks too.
+# Whether a sitemap page is a cam is decided by the iframe/HLS check below, NOT its URL —
+# many cam pages have no "webcam" in the name. `_SKIP` only drops pages that DO embed a
+# demo player but aren't a single cam (homepage, the demo index, product/info pages).
 _SKIP = (
     "hosting",
     "features",
@@ -24,8 +22,19 @@ _SKIP = (
     "ipnetwork",
     "map",
     "camsecure_webcam",
+    "webcam_live_clock",  # clock-overlay widget demo
+    "live_demo",  # the demo index page
+    "/index.html",
+    "site_information",
+    "/players/",
+    "cctv",
+    "software",
 )
-_CAM_HREF = re.compile(r'href="(/[^"]+\.html)"', re.I)
+_LOC = re.compile(r"<loc>([^<]+)</loc>")
+# Each cam page embeds its player in an iframe on camsecure.co/.uk (`httpswebcam/…`); that
+# player page is a video.js with a direct `/HLS/<name>.m3u8` (open CDN — segments need no
+# token/Referer; the player PAGE serves a decoy without `Referer: camsecure.co.uk`, so the
+# hosts are in `_REFERER_HOSTS`).
 _PLAYER_IFRAME = re.compile(
     r'<iframe[^>]+src="(https?://camsecure\.[a-z.]+/httpswebcam/[^"]+)"', re.I
 )
@@ -33,70 +42,75 @@ _HLS_SRC = re.compile(r'<source[^>]+src="([^"]+\.m3u8[^"]*)"', re.I)
 _TITLE = re.compile(r"<title>([^<]+)</title>", re.I)
 # "Brixham Harbour Live Streaming Webcam" -> "Brixham Harbour"; titles that LEAD with
 # boilerplate ("Live Coastal Shipping Webcam from Coastwatch Redcar") fall back to the
-# "from <place>" tail.
-_BOILER = re.compile(r"\s*\b(?:live\s+)?(?:streaming\s+)?webcam\b.*$", re.I)
+# "from <place>" tail, then to the URL filename.
+_BOILER = re.compile(r"\s*\b(?:live\s+)?(?:streaming\s+)?web\s?cam\b.*$", re.I)
 _LEADING_BOILER = re.compile(r"^(?:live|streaming|coastal)\b", re.I)
 _FROM = re.compile(r"\bfrom\s+(.+?)\s*$", re.I)
 
 
-def _clean_title(raw: str) -> str:
+def _name_from_url(url: str) -> str:
+    slug = unquote(url.rstrip("/").rsplit("/", 1)[-1])
+    slug = re.sub(r"\.html?$", "", slug, flags=re.I)
+    slug = re.sub(r"(?i)[_\- ]*(?:large|webcam|cam)\d*$", "", slug)
+    slug = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", slug)  # camelCase -> spaces
+    return re.sub(r"[_\-\s]+", " ", slug).strip().title()
+
+
+def _title_of(html: str, url: str) -> str:
+    m = _TITLE.search(html)
+    raw = m.group(1).strip() if m else ""
     t = _BOILER.sub("", raw).strip()
     if not t or _LEADING_BOILER.match(t):
-        m = _FROM.search(raw)
-        if m:
-            t = m.group(1).strip()
-    return t
+        fm = _FROM.search(raw)
+        t = fm.group(1).strip() if fm else ""
+    return t or _name_from_url(url)
 
 
-class CamSecureSource(HtmlScraperSource[str]):
-    """CamSecure's live-demo index -> per-cam pages -> the player iframe's direct HLS.
-    ctx is the cleaned cam title (the page <title>, boilerplate stripped)."""
+class CamSecureSource:
+    """CamSecure's sitemap -> per-cam pages -> the player iframe's direct HLS. A page is a
+    cam iff it embeds a camsecure player iframe whose player page has an HLS `<source>`;
+    both hops are fetched concurrently."""
 
     name: str = "camsecure"
+    _fetch: FetcherProtocol
 
-    @override
-    def _page_urls(self) -> list[str]:
-        idx = self._fetch.get(_INDEX) or ""
-        out: set[str] = set()
-        for href in _CAM_HREF.findall(idx):
-            low = href.lower()
-            if "webcam" not in low and not re.search(
-                r"/(camsecure[23]|christmas)/", low
-            ):
+    def __init__(self, fetch: FetcherProtocol) -> None:
+        self._fetch = fetch
+
+    def discover(self) -> Iterator[Candidate]:
+        sm = self._fetch.get(_SITEMAP) or ""
+        pages = sorted(
+            {
+                loc.replace(" ", "%20")
+                for loc in _LOC.findall(sm)
+                if "camsecure.co.uk" in loc.lower()
+                and urlsplit(loc).path.strip("/")  # not the homepage
+                and not any(s in loc.lower() for s in _SKIP)
+            }
+        )
+        # hop 1: cam pages -> (page, title, player url) for those embedding a player
+        found: list[tuple[str, str, str]] = []
+        for page, html in zip(pages, thread_map(self._fetch.get, pages)):
+            ifr = _PLAYER_IFRAME.search(html or "")
+            if ifr:
+                found.append((page, _title_of(html or "", page), ifr.group(1)))
+        # hop 2: player pages -> direct HLS (concurrent)
+        seen: set[str] = set()
+        players = thread_map(self._fetch.get, [f[2] for f in found])
+        for (page, title, player), pg in zip(found, players):
+            src = _HLS_SRC.search(pg or "")
+            if not src:
                 continue
-            if any(s in low for s in _SKIP):
-                continue
-            out.add(urljoin(_BASE, href.replace(" ", "%20")))  # %20 dupe -> one entry
-        return sorted(out)
-
-    @override
-    def _page_meta(self, html: str, url: str) -> tuple[str | None, str]:
-        m = _TITLE.search(html)
-        return None, (_clean_title(m.group(1).strip()) if m else "")
-
-    @override
-    def _title_for(
-        self, cand: Candidate, url: str, category: str | None, ctx: str
-    ) -> str:
-        return ctx
-
-    @override
-    def _candidates(self, html: str, url: str) -> list[Candidate]:
-        ifr = _PLAYER_IFRAME.search(html)
-        if not ifr:
-            return []  # a product/info page, not a cam
-        src = _HLS_SRC.search(self._fetch.get(ifr.group(1)) or "")
-        if not src:
-            return []  # offline / no stream on the player page
-        m3u8 = urljoin(ifr.group(1), src.group(1))
-        return [
-            Candidate(
-                title="",
+            m3u8 = urljoin(player, src.group(1))
+            if "rtsp.me" in m3u8 or m3u8 in seen:
+                continue  # rtsp.me stub passes liveness but 404s; or a dupe stream
+            seen.add(m3u8)
+            yield Candidate(
+                title=title,
                 angle_key=None,
                 category=None,  # no category in the feed -> "Other"
                 source=self.name,
-                source_page_url=url,
+                source_page_url=page,
                 target_url=m3u8,
                 predisc_key=predisc_key(m3u8),
             )
-        ]
