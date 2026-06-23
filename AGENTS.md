@@ -64,9 +64,17 @@ The app is two phases, decoupled by a catalogue snapshot:
   through raw so it reaches that path, and **crawl their category index first** —
   camscape's `/showing/`, skyline's `/en/live-cams.html` — logging slugs absent from
   their slug map (worldcams/cxtvlive have no clean index, so they surface unmapped
-  categories per-stream via `map_category`). `EXCLUDE_CATEGORIES` (config) post-filters
-  the built catalogue by mapped category, across all sources. The full excludable set
-  is `categories.ALL_CATEGORIES` — a test guards that the README list matches it.
+  categories per-stream via `map_category`). A cam that still lands in **"Other"** (the
+  source gave no category) gets a last-resort **title fallback** (`category_from_title`,
+  applied in `catalogue._to_entry` **only** when the mapped category is "Other" — never
+  over a real or "Unmapped" one): ordered keyword rules over the cam **name** (the part
+  before the `with_location` " — geo" suffix, so a region in the geo can't false-trigger),
+  first match wins (a species/"harbour" beats a generic "street"/"city"); failing that, a
+  name carrying a `City, Region, Country`-style geo is a place view → **"Travel & Events"**.
+  Keep `_TITLE_RULES` GENERAL (real category words, not one-off cam names) — an import-time
+  guard raises if a rule names a category outside `ALL_CATEGORIES`. `EXCLUDE_CATEGORIES`
+  (config) post-filters the built catalogue by mapped category, across all sources. The
+  full excludable set is `categories.ALL_CATEGORIES` — a test guards the README list matches.
 - **Add a config/env var** — parse it in `config.py` via the `_*_env` helpers, and
   ALWAYS validate: a bad/unparseable value must log a `WARNING` at startup and fall
   back to the default, never crash or silently misbehave (e.g. `_int_env` warns on a

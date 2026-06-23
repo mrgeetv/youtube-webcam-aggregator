@@ -457,3 +457,57 @@ def test_exclude_categories_drops_matching_entries() -> None:
         exclude_categories=frozenset({"animals"}),
     )
     assert {e.title for e in result} == {"Beach Cam"}
+
+
+def test_title_category_recovered_for_uncategorised() -> None:
+    # a source that gave no category -> "Other" -> recovered from the title keyword;
+    # a title with no signal stays "Other"
+    bear = _make_candidate(
+        key="hls:bear",
+        page="https://e.com/bear",
+        target="https://e.com/bear.m3u8",
+        title="Brown Bear Cam — Alaska, USA",
+    )
+    odd = _make_candidate(
+        key="hls:odd",
+        page="https://e.com/odd",
+        target="https://e.com/odd.m3u8",
+        title="Channel Cam",
+    )
+    result = build_catalogue(
+        [_Src("worldcams", [bear, odd])],
+        is_alive=_always_alive,
+        youtube_live=_no_yt_live,
+        history={},
+    )
+    cats = {e.title: e.category for e in result}
+    assert cats["Brown Bear Cam — Alaska, USA"] == "Animals"
+    assert cats["Channel Cam"] == "Other"
+
+
+def test_title_fallback_never_overrides_source_category() -> None:
+    # a real mapped category wins over a title keyword; an unrecognised source category
+    # stays "Unmapped Category" (only "Other" is title-recovered)
+    real = _make_candidate(
+        key="hls:r",
+        page="https://e.com/r",
+        target="https://e.com/r.m3u8",
+        title="Times Square",
+        category="Birds",  # -> Animals, NOT "Cities" from title
+    )
+    unmapped = _make_candidate(
+        key="hls:u",
+        page="https://e.com/u",
+        target="https://e.com/u.m3u8",
+        title="Bear Beach",
+        category="Zzz Unknown Probe Cat",
+    )
+    result = build_catalogue(
+        [_Src("worldcams", [real, unmapped])],
+        is_alive=_always_alive,
+        youtube_live=_no_yt_live,
+        history={},
+    )
+    cats = {e.title: e.category for e in result}
+    assert cats["Times Square"] == "Animals"
+    assert cats["Bear Beach"] == "Unmapped Category"

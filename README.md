@@ -188,9 +188,12 @@ Science & Technology, Seasonal, Space, Sports, Studios, Traffic, Trains & Railwa
 Travel & Events, Unmapped Category, Water & Waterways, Weather
 ```
 
-`Other` is for cams a source left uncategorised. `Unmapped Category` is different — it
-flags cams whose source *did* give a category we don't recognise yet, so a missing
-mapping is visible (and logged at build) instead of hidden in `Other`.
+`Other` is for cams a source left uncategorised *and* whose title gave no usable hint —
+when a source provides no category, the title is checked for a keyword (a species,
+`harbour`, `beach`, `ski`…) or a `City, Country`-style location (→ `Travel & Events`)
+before falling back to `Other`. `Unmapped Category` is different — it flags cams whose
+source *did* give a category we don't recognise yet, so a missing mapping is visible (and
+logged at build) instead of hidden in `Other`.
 
 ## Upgrading from v1
 

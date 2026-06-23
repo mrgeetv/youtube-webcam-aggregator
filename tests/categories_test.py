@@ -1,6 +1,10 @@
 import pytest
 
-from webcam_aggregator.categories import map_category, unknown_categories
+from webcam_aggregator.categories import (
+    category_from_title,
+    map_category,
+    unknown_categories,
+)
 
 
 def test_known_mappings():
@@ -65,6 +69,55 @@ def test_unknown_categories_returns_typos():
     assert unknown_categories(frozenset({"relgion", "animals"})) == frozenset(
         {"relgion"}
     )
+
+
+def test_category_from_title_keywords():
+    assert category_from_title("Brown Bear Cam - Brooks Falls") == "Animals"
+    assert category_from_title("Brixham Harbour") == "Ports & Ships"
+    assert category_from_title("Mount Buller Ski Area") == "Mountains"
+    assert category_from_title("Pinamar Beach") == "Beaches"
+    assert category_from_title("Niagara Falls") == "Water & Waterways"
+    assert category_from_title("St. Paul's Cathedral") == "Religion"
+    assert category_from_title("Times Square Skyline") == "Cities"
+    assert category_from_title("Aurora Borealis Live") == "Weather"
+
+
+def test_category_from_title_first_match_wins():
+    # specific beats generic: "harbour" (Ports, earlier rule) over "beach" (later)
+    assert category_from_title("Harbour Beach") == "Ports & Ships"
+    # a species beats a generic "street"
+    assert category_from_title("Eagle Street") == "Animals"
+
+
+def test_category_from_title_geo_default_to_travel():
+    # a named place + geo but no content word -> place view -> Travel & Events
+    assert category_from_title("Suzu — Ishikawa, Japan") == "Travel & Events"
+    assert (
+        category_from_title("Kensington Cam 6 Philadelphia, PA.") == "Travel & Events"
+    )
+    assert category_from_title("Vlora - Albania") == "Travel & Events"
+
+
+def test_category_from_title_keyword_uses_name_not_geo():
+    # a category word in the " — geo" suffix must NOT win; only the name counts
+    assert category_from_title("Old Mill — Lake District, England") == "Travel & Events"
+
+
+def test_category_from_title_no_signal_is_none():
+    # a bare word with no keyword and no geo stays Other (None)
+    assert category_from_title("Bude") is None
+    assert category_from_title("Channel Cam") is None
+
+
+def test_title_rule_categories_are_all_valid():
+    # every category the title fallback can emit must be a real, excludable category
+    from webcam_aggregator.categories import (
+        ALL_CATEGORIES,
+        TITLE_FALLBACK_CATEGORIES,
+    )
+
+    invalid = TITLE_FALLBACK_CATEGORIES - set(ALL_CATEGORIES)
+    assert not invalid, f"title rules emit non-categories: {invalid}"
 
 
 def test_readme_documents_every_category():
