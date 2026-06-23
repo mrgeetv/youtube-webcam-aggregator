@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.6.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.5.0...v2.6.0) (2026-06-23)
+
+### Features
+
+* **scraper:** add EarthCam mapsearch source (+ fix Fetcher.post baltic) ([#82](https://github.com/mrgeetv/live-webcam-aggregator/issues/82)) ([396ce9f](https://github.com/mrgeetv/live-webcam-aggregator/commit/396ce9f1b3f8efe03d0acc9b873554f1a162c16c))
+
 ## [2.5.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.4.0...v2.5.0) (2026-06-21)
 
 ### Features
