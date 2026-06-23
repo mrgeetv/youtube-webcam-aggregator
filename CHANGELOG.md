@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.9.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.8.0...v2.9.0) (2026-06-23)
+
+### Features
+
+* **scraper:** recover categories for uncategorised cams from their titles ([#85](https://github.com/mrgeetv/live-webcam-aggregator/issues/85)) ([2b9f3ed](https://github.com/mrgeetv/live-webcam-aggregator/commit/2b9f3edac01f227fbbad91c3a405d5194bbe3952))
+
 ## [2.8.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.7.0...v2.8.0) (2026-06-23)
 
 ### Features
