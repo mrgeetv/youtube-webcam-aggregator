@@ -29,6 +29,7 @@ from .registry import Registry
 from .serving import render_playlist, serve_child_manifest, serve_segment, serve_stream
 from .sources.camscape import CamscapeSource
 from .sources.cxtvlive import CxtvliveSource
+from .sources.earthcam import EarthCamSource
 from .sources.skyline import SkylineSource
 from .sources.worldcams import WorldcamsSource
 from .sources.youtube_api import YoutubeApiSource
@@ -347,6 +348,7 @@ def build_app(
             CxtvliveSource(fetcher),
             SkylineSource(fetcher),
             CamscapeSource(fetcher),
+            EarthCamSource(fetcher),
         )
         if s is not None
     ]

@@ -482,6 +482,45 @@ def test_post_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
     assert decoded["id"] == ["42"]
     # supplied headers must be forwarded
     assert captured_headers[0]["X-Requested-With"] == "XMLHttpRequest"
+    # and the form Content-Type must be set by default (pre-encoded bytes won't get it
+    # auto-added by requests, and servers like WP admin-ajax 400 without it)
+    assert captured_headers[0]["Content-Type"] == "application/x-www-form-urlencoded"
+
+
+def test_post_caller_can_override_content_type(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "webcam_aggregator.fetch.socket.getaddrinfo",
+        lambda *_a, **_k: _mock_getaddrinfo("93.184.216.34"),
+    )
+    captured_headers: list[dict[str, str]] = []
+
+    class _OkResp:
+        is_redirect: bool = False
+        is_permanent_redirect: bool = False
+
+        def raise_for_status(self) -> None: ...
+
+        def iter_content(self, _n: int) -> object:
+            return iter([b"ok"])
+
+        def close(self) -> None: ...
+
+    def fake_post(
+        _self: object, _url: str, *, headers: dict[str, str], **_k: object
+    ) -> _OkResp:
+        captured_headers.append(headers)
+        return _OkResp()
+
+    monkeypatch.setattr("requests.Session.post", fake_post)
+    f = Fetcher(delay=0.0, retries=1)
+    f.post(
+        "https://example.com/x",
+        {"a": "b"},
+        headers={"Content-Type": "application/json"},
+    )
+    assert captured_headers[0]["Content-Type"] == "application/json"
 
 
 def test_post_refuses_redirect(monkeypatch: pytest.MonkeyPatch) -> None:

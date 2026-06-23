@@ -306,13 +306,18 @@ class Fetcher:
             return None
         host = urlsplit(url).hostname or ""
         body = urlencode(data).encode()
+        # Sending pre-encoded bytes means requests won't auto-set the form Content-Type,
+        # and servers (e.g. WordPress admin-ajax) then 400 — can't parse $_POST. Set it
+        # ourselves; a caller can still override via `headers`.
+        post_headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        post_headers.update(headers or {})
         for attempt in range(self._retries):
             try:
                 with _PinDNS(host, ip):
                     resp = self._session.post(
                         url,
                         data=body,
-                        headers=headers or {},
+                        headers=post_headers,
                         timeout=timeout,
                         stream=True,
                         allow_redirects=False,

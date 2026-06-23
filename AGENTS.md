@@ -108,6 +108,14 @@ The app is two phases, decoupled by a catalogue snapshot:
   (server fetch gets only stub manifests, segments 404) + angelcam (auth) are
   unservable, dropped. Category + location come from the cam page's
   `/showing/<cat>` + `/location/<loc>` tags.
+- EarthCam is a source via its **mapsearch JSON API** (no HTML scrape): `get_locations_network`
+  (its own cams) + the global-bbox `get_locations` (the whole map, incl partners). It's a
+  meta-aggregator — ~4000 mapped cams across 2400+ one-off sites — so `EarthCamSource._routable`
+  keeps only URLs that hit an existing extractor: EarthCam's own geographic pages (`/usa/`,
+  `/world/` resolve; `/clients/`, `/top25/`, `myearthcam.com` roots don't) + partner YouTube /
+  balticlivecam / ipcamlive / direct-HLS. The long tail (gov traffic cams = static JPEG, the
+  one-off sites) is dropped. The API needs the `earthcam.com` Referer (`_REFERER_HOSTS`); the
+  feed carries no content category → all "Other".
 
 **Security model:** every outbound fetch is validated by `fetch._resolve_validated_ip`
 (rejects non-http(s) and private/loopback/link-local/reserved IPs), an 8 MB cap, and
