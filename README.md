@@ -13,6 +13,7 @@ stream is actually played.
 | Source | What it adds |
 | ------ | ------------ |
 | camscape.com | Scraped camera directory |
+| camsecure.co.uk | Scraped camera directory |
 | cxtvlive.com | Scraped camera directory |
 | earthcam.com | Scraped camera directory |
 | skylinewebcams.com | Scraped camera directory |

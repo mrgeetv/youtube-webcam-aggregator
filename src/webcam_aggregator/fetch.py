@@ -170,8 +170,14 @@ class FetcherPostProtocol(Protocol):
     ) -> str | None: ...
 
 
-# Hosts whose HLS manifest + segments 403 without a Referer (their CDN gates on it).
-_REFERER_HOSTS: dict[str, str] = {"earthcam.com": "https://www.earthcam.com/"}
+# Hosts that gate on a Referer: EarthCam's CDN 403s the manifest/segments without it;
+# CamSecure's player pages (camsecure.co/.uk) serve a decoy page without it, hiding the
+# HLS <source>.
+_REFERER_HOSTS: dict[str, str] = {
+    "earthcam.com": "https://www.earthcam.com/",
+    "camsecure.co": "https://www.camsecure.co.uk/",
+    "camsecure.uk": "https://www.camsecure.co.uk/",
+}
 
 
 def _referer_for(url: str) -> dict[str, str]:
