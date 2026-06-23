@@ -172,6 +172,7 @@ live-webcam-aggregator/
 │           ├── worldcams.py    # Worldcams.net scraper source
 │           ├── cxtvlive.py     # CXTV Live scraper source
 │           ├── camscape.py     # Camscape aggregator scraper source
+│           ├── earthcam.py     # EarthCam mapsearch API source
 │           └── skyline.py      # SkylineWebcams scraper source
 ├── scripts/                    # Helper scripts
 │   ├── run.sh                  # Docker build/run script
