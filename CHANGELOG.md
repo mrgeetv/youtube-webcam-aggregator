@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.7.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.6.0...v2.7.0) (2026-06-23)
+
+### Features
+
+* **scraper:** add CamSecure source (~210 UK direct-HLS cams via sitemap) ([#83](https://github.com/mrgeetv/live-webcam-aggregator/issues/83)) ([2a81458](https://github.com/mrgeetv/live-webcam-aggregator/commit/2a8145841045bcaf93be3fcf0cdc4d6ad594dbeb))
+
 ## [2.6.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.5.0...v2.6.0) (2026-06-23)
 
 ### Features
