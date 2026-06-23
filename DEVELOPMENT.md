@@ -220,6 +220,12 @@ the cam lands in the `Unmapped Category` group rather than `Other`; camscape and
 also log an upfront per-source line listing the unmapped category slugs they crawled. Add
 the mapping to `categories._MAP` (or the source's own slug map) to clear it.
 
+A cam a source left **uncategorised** (would be `Other`) gets a title-keyword fallback
+(`categories.category_from_title`): keywords in the cam name (`beach`, `harbour`, a
+species, `ski`…) map to a category, and failing that a `City, Country`-style location in
+the title makes it `Travel & Events`; only titles with no signal at all stay `Other`. It
+never touches a cam that already has a real or `Unmapped` category.
+
 Suspect config logs a `WARNING` at startup rather than failing silently: a non-numeric
 `CATALOGUE_INTERVAL_HOURS`/`SCRAPE_WORKERS`/`MAX_PARALLEL_SOURCES`, a
 non-`true`/`false` `PROXY_YOUTUBE`, an

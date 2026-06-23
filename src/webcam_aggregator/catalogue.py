@@ -5,7 +5,7 @@ import threading
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field, replace
 
-from .categories import map_category
+from .categories import category_from_title, map_category
 from .dedup import dedupe
 from .fetch import thread_map
 from .models import Candidate, CatalogueEntry, stable_id
@@ -28,10 +28,15 @@ class Hist:
 
 
 def _to_entry(c: Candidate) -> CatalogueEntry:
+    # A source that gave no category lands in "Other"; try to recover one from the title
+    # before giving up. Only for "Other" — never override a real or "Unmapped" category.
+    category = map_category(c.category)
+    if category == "Other":
+        category = category_from_title(c.title) or "Other"
     return CatalogueEntry(
         id=stable_id(c),
         title=c.title or "(untitled)",
-        category=map_category(c.category),
+        category=category,
         source=c.source,
         source_page_url=c.source_page_url,
         target_url=c.target_url,
