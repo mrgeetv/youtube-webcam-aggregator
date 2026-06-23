@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.8.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.7.0...v2.8.0) (2026-06-23)
+
+### Features
+
+* **scraper:** add explore.org + Wildlife Trusts nature-cam sources ([#84](https://github.com/mrgeetv/live-webcam-aggregator/issues/84)) ([787463e](https://github.com/mrgeetv/live-webcam-aggregator/commit/787463e50872b28776490c85abbe1f7923dba088)), closes [#81](https://github.com/mrgeetv/live-webcam-aggregator/issues/81)
+
 ## [2.7.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.6.0...v2.7.0) (2026-06-23)
 
 ### Features
