@@ -128,6 +128,20 @@ The app is two phases, decoupled by a catalogue snapshot:
   manifest passes liveness but segments 404). Titles come from the page `<title>` (boilerplate
   stripped, the "… from `<place>`" tail when it leads with boilerplate, the URL filename as a
   last resort). No category → "Other".
+- explore.org is a source via its **`streams.json`** API (`d11gsgd2hj8qxd.cloudfront.net`,
+  the `id_in` filter is ignored — one call returns all ~160). Keep `state == "live"` with a
+  `.m3u8` `playlistUrl` (~140) — a direct, open HLS served by `DirectHls` (no token/Referer).
+  We deliberately use the HLS, **not** YouTube: explore embeds each cam's YouTube from its
+  **partner** channel (so there's no single channel to enumerate, and the per-cam id is
+  JS-redacted on the page), and `streams.json` is the only complete list. Trade-off: cams
+  also on YouTube can't dedup (the `hls:` key won't merge a `yt:` one) — accepted as a small,
+  bounded overlap. No category in the feed → "Other".
+- The Wildlife Trusts webcams index links out to ~17 **regional-trust** cam pages on their own
+  domains, mostly YouTube embeds the standard ladder resolves; all are wildlife → hardcoded
+  category **Animals**. Titles come from the index link text (the "`<Region> Wildlife Trust`"
+  prefix + trailing "Watch…" stripped). Pages whose embed is JS/consent-gated (no id in the
+  static HTML, or only a channel link) yield nothing and drop — so only the statically-
+  extractable ones (~11) make it.
 
 **Security model:** every outbound fetch is validated by `fetch._resolve_validated_ip`
 (rejects non-http(s) and private/loopback/link-local/reserved IPs), an 8 MB cap, and

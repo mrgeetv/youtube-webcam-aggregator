@@ -174,7 +174,9 @@ live-webcam-aggregator/
 │           ├── camscape.py     # Camscape aggregator scraper source
 │           ├── camsecure.py    # CamSecure scraper source (sitemap -> direct HLS)
 │           ├── earthcam.py     # EarthCam mapsearch API source
-│           └── skyline.py      # SkylineWebcams scraper source
+│           ├── explore.py      # explore.org streams.json source (direct HLS)
+│           ├── skyline.py      # SkylineWebcams scraper source
+│           └── wildlife_trusts.py  # The Wildlife Trusts index -> regional YouTube cams
 ├── scripts/                    # Helper scripts
 │   ├── run.sh                  # Docker build/run script
 │   └── check-python-version.sh
