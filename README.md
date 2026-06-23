@@ -16,7 +16,9 @@ stream is actually played.
 | camsecure.co.uk | Scraped camera directory |
 | cxtvlive.com | Scraped camera directory |
 | earthcam.com | Scraped camera directory |
+| explore.org | Scraped camera directory |
 | skylinewebcams.com | Scraped camera directory |
+| wildlifetrusts.org | Scraped camera directory |
 | worldcams.tv | Scraped camera directory |
 | YouTube Data API | Live webcam broadcasts found by search |
 

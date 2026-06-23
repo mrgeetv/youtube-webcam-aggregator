@@ -31,7 +31,9 @@ from .sources.camscape import CamscapeSource
 from .sources.camsecure import CamSecureSource
 from .sources.cxtvlive import CxtvliveSource
 from .sources.earthcam import EarthCamSource
+from .sources.explore import ExploreOrgSource
 from .sources.skyline import SkylineSource
+from .sources.wildlife_trusts import WildlifeTrustsSource
 from .sources.worldcams import WorldcamsSource
 from .sources.youtube_api import YoutubeApiSource
 
@@ -351,6 +353,8 @@ def build_app(
             CamscapeSource(fetcher),
             EarthCamSource(fetcher),
             CamSecureSource(fetcher),
+            ExploreOrgSource(fetcher),
+            WildlifeTrustsSource(fetcher),
         )
         if s is not None
     ]
