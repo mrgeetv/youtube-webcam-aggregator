@@ -28,6 +28,7 @@ from .models import Candidate, CatalogueEntry
 from .registry import Registry
 from .serving import render_playlist, serve_child_manifest, serve_segment, serve_stream
 from .sources.camscape import CamscapeSource
+from .sources.camsecure import CamSecureSource
 from .sources.cxtvlive import CxtvliveSource
 from .sources.earthcam import EarthCamSource
 from .sources.skyline import SkylineSource
@@ -349,6 +350,7 @@ def build_app(
             SkylineSource(fetcher),
             CamscapeSource(fetcher),
             EarthCamSource(fetcher),
+            CamSecureSource(fetcher),
         )
         if s is not None
     ]

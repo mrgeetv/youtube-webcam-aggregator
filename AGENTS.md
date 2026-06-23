@@ -116,6 +116,14 @@ The app is two phases, decoupled by a catalogue snapshot:
   balticlivecam / ipcamlive / direct-HLS. The long tail (gov traffic cams = static JPEG, the
   one-off sites) is dropped. The API needs the `earthcam.com` Referer (`_REFERER_HOSTS`); the
   feed carries no content category → all "Other".
+- CamSecure is a 3-hop scrape: the live-demo index → per-cam pages → the player iframe on
+  `camsecure.co`/`.uk` (`httpswebcam/…`) whose video.js carries a direct `/HLS/<name>.m3u8`
+  (open CDN, served by `DirectHls`; segments need no token/Referer). The player **page**
+  serves a decoy without `Referer: camsecure.co.uk`, so `camsecure.co`/`.uk` are in
+  `_REFERER_HOSTS`. Index product/info pages (hosting/FAQ/world-map) also carry "webcam" but
+  are dropped by a name denylist + the iframe/HLS checks; titles come from the page `<title>`
+  (boilerplate stripped, the "… from `<place>`" tail used when it leads with boilerplate).
+  No category → "Other".
 
 **Security model:** every outbound fetch is validated by `fetch._resolve_validated_ip`
 (rejects non-http(s) and private/loopback/link-local/reserved IPs), an 8 MB cap, and

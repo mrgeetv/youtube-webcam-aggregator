@@ -11,6 +11,7 @@ from webcam_aggregator.fetch import (
     Fetcher,
     _pin,  # pyright: ignore[reportPrivateUsage]
     _PinDNS,  # pyright: ignore[reportPrivateUsage]
+    _referer_for,  # pyright: ignore[reportPrivateUsage]
     _resolve_validated_ip,  # pyright: ignore[reportPrivateUsage]
     resolve_scrape_workers,
 )
@@ -433,6 +434,22 @@ def test_post_blocks_unsafe_url(monkeypatch: pytest.MonkeyPatch) -> None:
     f = Fetcher(delay=0.0, retries=1)
     assert f.post("http://127.0.0.1/admin-ajax.php", {"action": "auth_token"}) is None
     assert not called[0]
+
+
+def test_referer_for_gated_hosts() -> None:
+    # CamSecure player pages + EarthCam CDN get the right Referer; others get none.
+    assert _referer_for("https://camsecure.co/httpswebcam/camsecure/brixham1.html") == {
+        "Referer": "https://www.camsecure.co.uk/"
+    }
+    assert _referer_for("https://camsecure.uk/HLS/x.m3u8") == {
+        "Referer": "https://www.camsecure.co.uk/"
+    }
+    assert _referer_for("https://videos-3.earthcam.com/x/playlist.m3u8") == {
+        "Referer": "https://www.earthcam.com/"
+    }
+    # the embedding site itself (.co.uk) and unrelated hosts get nothing
+    assert _referer_for("https://www.camsecure.co.uk/oban.html") == {}
+    assert _referer_for("https://example.com/x") == {}
 
 
 def test_post_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
