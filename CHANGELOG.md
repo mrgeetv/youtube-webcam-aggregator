@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.9.1](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.9.0...v2.9.1) (2026-06-26)
+
+### Bug Fixes
+
+* **deps:** bump actions/cache from 5.0.5 to 6.0.0 ([#87](https://github.com/mrgeetv/live-webcam-aggregator/issues/87)) ([821722f](https://github.com/mrgeetv/live-webcam-aggregator/commit/821722f8484b1208ff25491bfbf43e49c4855e5f))
+* **deps:** bump actions/setup-python from 6.2.0 to 6.3.0 ([#86](https://github.com/mrgeetv/live-webcam-aggregator/issues/86)) ([f71bac4](https://github.com/mrgeetv/live-webcam-aggregator/commit/f71bac4fc932f1c6b3cf4449cdcb8e4abc1fa5eb))
+* **deps:** bump google-api-python-client ([#88](https://github.com/mrgeetv/live-webcam-aggregator/issues/88)) ([072a5de](https://github.com/mrgeetv/live-webcam-aggregator/commit/072a5de03f4e351844af165c87c293b0f0ff59fe))
+
 ## [2.9.0](https://github.com/mrgeetv/live-webcam-aggregator/compare/v2.8.0...v2.9.0) (2026-06-23)
 
 ### Features
